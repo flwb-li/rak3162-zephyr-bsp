@@ -1,4 +1,5 @@
 #include "at/hw_at.h"
+#include "lora/hw_lora_p2p.h"
 #include "lora/hw_lorawan.h"
 #include "storage/hw_storage.h"
 
@@ -156,6 +157,11 @@ int hw_at_cmd_join(const struct hw_at_request *req)
 	if (req->form != HW_AT_FORM_EXEC) {
 		param_error();
 		return -EINVAL;
+	}
+
+	if (hw_lora_p2p_is_active()) {
+		hw_at_resp_line("AT_ERROR: stop P2P first (AT+PRECV=0)");
+		return -EBUSY;
 	}
 
 	hw_storage_get_active_cfg(&cfg);

@@ -498,6 +498,10 @@ void hw_at_init(void)
     (void)hw_at_register_command("SLEEP", cmd_sleep, "AT+SLEEP");
     (void)hw_at_register_command("DEVEUI", hw_at_cmd_deveui, "AT+DEVEUI");
     (void)hw_at_register_command("APPEUI", hw_at_cmd_appeui, "AT+APPEUI");
+    (void)hw_at_register_command("P2P", hw_at_cmd_p2p, "AT+P2P");
+    (void)hw_at_register_command("PRECV", hw_at_cmd_precv, "AT+PRECV");
+    (void)hw_at_register_command("PSEND", hw_at_cmd_psend, "AT+PSEND");
+    (void)hw_at_register_command("CW", hw_at_cmd_cw, "AT+CW");
     (void)hw_at_register_command("APPKEY", hw_at_cmd_appkey, "AT+APPKEY");
     (void)hw_at_register_command("NWKKEY", hw_at_cmd_nwkkey, "AT+NWKKEY");
     (void)hw_at_register_command("JOIN", hw_at_cmd_join, "AT+JOIN");

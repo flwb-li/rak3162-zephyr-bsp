@@ -7,6 +7,7 @@
 #include "core/hw_console.h"
 #include "core/hw_led.h"
 #include "core/hw_xo_cap.h"
+#include "lora/hw_lora_p2p.h"
 #include "storage/hw_storage.h"
 
 LOG_MODULE_REGISTER(hw_main, LOG_LEVEL_INF);
@@ -32,8 +33,9 @@ int main(void)
 		hw_runtime_apply_stored_caps(&active_cfg);
 	}
 
+	hw_lora_p2p_init();
 	hw_at_init();
-	LOG_INF("AT framework init done (LoRaWAN OTAA via AT+JOIN)");
+	LOG_INF("AT framework init done (P2P + LoRaWAN OTAA)");
 
 	ret = hw_led_start();
 	if (ret != 0) {

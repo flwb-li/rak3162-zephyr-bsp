@@ -20,5 +20,6 @@ target_sources(app PRIVATE
     src/at/hw_at_lorawan.c
     src/at/hw_at_test.c
     src/at/hw_at_ble_cw.c
+    src/lora/hw_lora_p2p.c
     src/lora/hw_lorawan.c
 )
