@@ -1,8 +1,6 @@
 manifest:
 
   remotes:
-    - name: lora-net
-      url-base: https://github.com/Lora-net
     - name: zephyrproject
       url-base: https://github.com/zephyrproject-rtos
 
@@ -12,18 +10,6 @@ manifest:
       repo-path: zephyr
       revision: v4.3.0
       import: true
-
-    - name: usp_zephyr
-      remote: lora-net
-      repo-path: usp_zephyr
-      revision: v1.1.2-feature-202604
-      path: rak3162-zephyr-bsp/modules/semtech/usp_zephyr
-
-    - name: usp
-      remote: lora-net
-      path: modules/lib/usp
-      revision: v1.1.2-feature-202604
-      submodules: true
 
   self:
     path: rak3162-zephyr-bsp

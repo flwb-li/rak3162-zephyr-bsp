@@ -88,5 +88,5 @@ if [[ "${DRY_RUN}" -eq 0 ]]; then
 fi
 
 echo "Done. Build example:"
-echo "  west build -b rak3162/nrf54l15/cpuapp samples/rak/hw_test -- -DZEPHYR_EXTRA_MODULES=\"<usp_zephyr>;<usp>\""
-echo "Note: LoRa samples still require Semtech usp_zephyr + usp modules."
+echo "  west build -b rak3162/nrf54l15/cpuapp samples/rak/hw_test"
+echo "LoRaWAN uses Zephyr CONFIG_LORAWAN (no Semtech USP modules required)."

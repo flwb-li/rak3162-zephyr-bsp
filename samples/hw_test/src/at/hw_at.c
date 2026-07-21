@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/device.h>
 #include <zephyr/drivers/timer/nrf_grtc_timer.h>
 #include <zephyr/drivers/hwinfo.h>
 #include <zephyr/logging/log.h>
@@ -21,7 +22,6 @@
 #include "core/hw_console.h"
 #include "core/hw_led.h"
 #include "core/hw_xo_cap.h"
-#include "lora/hw_lora_test.h"
 #include "storage/hw_storage.h"
 
 #include "config.h"
@@ -287,48 +287,17 @@ static int cmd_atver(const struct hw_at_request *req)
     }
 }
 
-static bool parse_sleep_radio_mode(const char *mode, enum hw_lora_radio_low_power_mode *out)
-{
-    if ((mode == NULL) || (*mode == '\0') || (out == NULL)) {
-        return false;
-    }
-
-    if ((strcasecmp(mode, "SLEEP") == 0) || (strcasecmp(mode, "SLEEP_WARM") == 0)) {
-        *out = HW_LORA_RADIO_LOW_POWER_SLEEP_WARM;
-        return true;
-    }
-    if (strcasecmp(mode, "SLEEP_COLD") == 0) {
-        *out = HW_LORA_RADIO_LOW_POWER_SLEEP_COLD;
-        return true;
-    }
-    if ((strcasecmp(mode, "STDBY_RC") == 0) || (strcasecmp(mode, "STANDBY_RC") == 0)) {
-        *out = HW_LORA_RADIO_LOW_POWER_STANDBY_RC;
-        return true;
-    }
-    if ((strcasecmp(mode, "STDBY_XOSC") == 0) || (strcasecmp(mode, "STANDBY_XOSC") == 0)) {
-        *out = HW_LORA_RADIO_LOW_POWER_STANDBY_XOSC;
-        return true;
-    }
-
-    return false;
-}
-
 static int cmd_sleep(const struct hw_at_request *req)
 {
     if (req->form == HW_AT_FORM_HELP) {
-        hw_at_resp_line("AT+SLEEP=<delay_ms>[,<radio_mode>]");
-        hw_at_resp_line("radio_mode: SLEEP, SLEEP_COLD, STDBY_RC, STDBY_XOSC");
+        hw_at_resp_line("AT+SLEEP=<delay_ms>");
+        hw_at_resp_line("Delay then enter System OFF (optional GRTC wakeup via AT+RTC)");
         resp_ok();
         return 0;
     }
 
     if (req->form == HW_AT_FORM_SET) {
-        char args[48];
-        char *comma;
-        char *delay_arg;
-        char *mode_arg = NULL;
         unsigned long delay_ms = 0;
-        enum hw_lora_radio_low_power_mode radio_mode = HW_LORA_RADIO_LOW_POWER_SLEEP_WARM;
         int parsed = 0;
         int ret;
 
@@ -337,37 +306,10 @@ static int cmd_sleep(const struct hw_at_request *req)
             return -EINVAL;
         }
 
-        if (strlen(req->args) >= sizeof(args)) {
-            resp_param_error();
-            return -EINVAL;
-        }
-
-        snprintf(args, sizeof(args), "%s", req->args);
-        delay_arg = trim(args);
-        comma = strchr(delay_arg, ',');
-        if (comma != NULL) {
-            *comma = '\0';
-            mode_arg = trim(comma + 1);
-        }
-
-        parsed = sscanf(delay_arg, "%lu", &delay_ms);
+        parsed = sscanf(req->args, "%lu", &delay_ms);
         if (parsed != 1) {
             resp_param_error();
             return -EINVAL;
-        }
-        if ((mode_arg != NULL) && !parse_sleep_radio_mode(mode_arg, &radio_mode)) {
-            resp_param_error();
-            return -EINVAL;
-        }
-
-        ret = hw_lora_radio_enter_low_power(radio_mode);
-        if (ret == -EBUSY) {
-            resp_status("RADIO_BUSY");
-            return ret;
-        }
-        if (ret != 0) {
-            resp_at_error();
-            return ret;
         }
 
         if (rtc_wakeup_delay_s > 0U) {
@@ -556,10 +498,11 @@ void hw_at_init(void)
     (void)hw_at_register_command("SLEEP", cmd_sleep, "AT+SLEEP");
     (void)hw_at_register_command("DEVEUI", hw_at_cmd_deveui, "AT+DEVEUI");
     (void)hw_at_register_command("APPEUI", hw_at_cmd_appeui, "AT+APPEUI");
-    (void)hw_at_register_command("P2P", hw_at_cmd_p2p, "AT+P2P");
-    (void)hw_at_register_command("PRECV", hw_at_cmd_precv, "AT+PRECV");
-    (void)hw_at_register_command("PSEND", hw_at_cmd_psend, "AT+PSEND");
-    (void)hw_at_register_command("CW", hw_at_cmd_cw, "AT+CW");
+    (void)hw_at_register_command("APPKEY", hw_at_cmd_appkey, "AT+APPKEY");
+    (void)hw_at_register_command("NWKKEY", hw_at_cmd_nwkkey, "AT+NWKKEY");
+    (void)hw_at_register_command("JOIN", hw_at_cmd_join, "AT+JOIN");
+    (void)hw_at_register_command("SEND", hw_at_cmd_send, "AT+SEND");
+    (void)hw_at_register_command("CLASS", hw_at_cmd_class, "AT+CLASS");
     (void)hw_at_register_command("TEST", hw_at_cmd_test, "AT+TEST");
     (void)hw_at_register_command("HFXOCAP", cmd_hfxocap, "AT+HFXOCAP");
     (void)hw_at_register_command("LFXOCAP", cmd_lfxocap, "AT+LFXOCAP");

@@ -6,15 +6,16 @@ Based on **Zephyr v4.3.0** and West.
 **Repository:** https://github.com/flwb-li/rak3162-zephyr-bsp
 
 SX1262 is part of the board device tree — **no `--shield` is required**.
+LoRaWAN uses Zephyr **`CONFIG_LORAWAN`** (loramac-node). There is **no Semtech USP** dependency.
 
 ## Contents
 
 | Path | Description |
 |------|-------------|
-| `boards/rak3162/` | Board support (DTS includes onboard SX1262) |
-| `samples/hw_test/` | Hardware test firmware (AT commands, LoRa, BLE CW, …) |
+| `boards/rak3162/` | Board support (DTS includes onboard SX1262 as `semtech,sx1262`) |
+| `samples/hw_test/` | Single sample: AT console + LoRaWAN OTAA Class A |
 | `zephyr/module.yml` | Registers this tree as a Zephyr module (`board_root`) |
-| `west.yml` | West manifest (Zephyr + Semtech USP) |
+| `west.yml` | West manifest (Zephyr v4.3.0 only) |
 | `scripts/install_into_zephyr.sh` | Mode 2: copy boards/samples into an existing Zephyr tree |
 | `scripts/uninstall_from_zephyr.sh` | Mode 2: remove installed files |
 
@@ -44,9 +45,7 @@ Workspace layout after `west update`:
 rak3162-workspace/
 ├── rak3162-zephyr-bsp/               # this BSP (manifest)
 │   ├── boards/
-│   ├── samples/
-│   └── modules/semtech/usp_zephyr/   # from west.yml
-├── modules/lib/usp/                  # from west.yml
+│   └── samples/
 └── zephyr/                           # Zephyr v4.3.0
 ```
 
@@ -63,11 +62,9 @@ west update
 Pin Zephyr to **v4.3.0**, then:
 
 ```bash
-export ZEPHYR_EXTRA_MODULES="/path/to/rak3162-zephyr-bsp;/path/to/usp_zephyr;/path/to/usp"
+export ZEPHYR_EXTRA_MODULES="/path/to/rak3162-zephyr-bsp"
 west build -b rak3162/nrf54l15/cpuapp /path/to/rak3162-zephyr-bsp/samples/hw_test
 ```
-
-Or rely on `west.yml` / `ZEPHYR_EXTRA_MODULES` as in `samples/hw_test/CMakeLists.txt`.
 
 ## Mode 2 — Install into a local Zephyr tree
 
@@ -86,11 +83,14 @@ Uninstall:
 ./scripts/uninstall_from_zephyr.sh /path/to/zephyr
 ```
 
-**Note:** Mode 2 only copies board + sample sources. LoRa still needs Semtech **usp_zephyr** and **usp** (via west or `ZEPHYR_EXTRA_MODULES`).
+## LoRaWAN region
+
+Default region is **EU868** (`CONFIG_LORAMAC_REGION_EU868=y` in `samples/hw_test/prj.conf`).
+To change region, edit `prj.conf` and enable another `CONFIG_LORAMAC_REGION_*` (e.g. `US915`, `AS923`).
 
 ## Onboard SX1262
 
-Radio is defined in `boards/rak3162/rak3162_nrf54l15_cpuapp.dts` (SPI `spi22` / `rak_lora_spi`, CS P1.12, RESET P0.04, BUSY P1.13, DIO1 P0.01, DIO2 RF switch, DIO3 TCXO).
+Radio is defined in `boards/rak3162/rak3162_nrf54l15_cpuapp.dts` (SPI `spi22` / `rak_lora_spi`, CS P1.12, RESET P0.04, BUSY P1.13, DIO1 P0.01, DIO2 RF switch, DIO3 TCXO). Alias: `lora0`.
 
 Do **not** pass `--shield rak_sx1262`.
 
@@ -98,15 +98,6 @@ Do **not** pass `--shield rak_sx1262`.
 
 See `doc/hardware_pins.md` and `boards/rak3162/doc/hardware_pins.md`.
 AT command reference: `samples/hw_test/doc/AT_COMMANDS.md`.
-
-## Semtech USP
-
-`west.yml` pulls:
-
-- `usp_zephyr` @ `v1.1.2-feature-202604`
-- `usp` @ same revision (with submodules)
-
-GitHub access to [Lora-net](https://github.com/Lora-net) is required for `west update`.
 
 ## Version
 
