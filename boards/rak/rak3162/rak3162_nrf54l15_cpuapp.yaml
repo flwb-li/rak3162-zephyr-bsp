@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+identifier: rak3162/nrf54l15/cpuapp
+name: RAK3162
+vendor: rak
+arch: arm
+toolchain:
+  - zephyr
+sysbuild: true
+ram: 188
+flash: 1428
+supported:
+  - gpio
+  - i2c
+  - spi
+  - uart
+  - lora
+  - watchdog

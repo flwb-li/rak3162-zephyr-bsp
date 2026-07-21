@@ -1,0 +1,190 @@
+/*
+ * Copyright (c) 2026 RAK Wireless
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * RAK3162 board (nRF54L15) with onboard Semtech SX1262 LoRa radio.
+ *
+ * RF Switch (RTC66006, U3):
+ *   Power: P0.00 (ANT_SW) --R5(100Ω)--> RTC66006 VDD (regulator-boot-on)
+ *   Direction: SX1262 DIO2 --> RTC66006 CTRL (dio2-as-rf-switch)
+ *
+ * TCXO: SX1262 DIO3 powers X3 (32 MHz); dio3-as-tcxo-control.
+ *
+ * LoRa SPI: spi22 (SCK=P1.11, MOSI=P1.10, MISO=P1.09), CS=P1.12
+ *   RESET=P0.04, BUSY=P1.13, DIO1=P0.01
+ */
+
+/dts-v1/;
+#include <nordic/nrf54l15_cpuapp.dtsi>
+#include <zephyr/dt-bindings/usp/sx126x.h>
+#include "rak3162_common.dtsi"
+#include "rak3162_connector.dtsi"
+
+/ {
+	model = "RAK Wireless RAK3162";
+	compatible = "rak,rak3162-cpuapp";
+
+	chosen {
+		zephyr,code-partition = &slot0_partition;
+		zephyr,sram         = &cpuapp_sram;
+		zephyr,flash        = &cpuapp_rram;
+		zephyr,console      = &uart20;
+		zephyr,shell-uart   = &uart20;
+		zephyr,lorawan-transceiver = &lora_rak_sx1262;
+	};
+
+	/* ANT_SW: P0.00 → R5 (100Ω) → RTC66006 VDD
+	 * Defaults to HIGH upon power-up, supplying power to the RF switch IC.
+	 * During low-power operation, call regulator_disable() to cut RF section power.
+	 */
+	lora_ant_sw: lora-ant-sw {
+		compatible = "regulator-fixed";
+		regulator-name = "lora-ant-sw";
+		enable-gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+		regulator-boot-on;
+		startup-delay-us = <1000>;
+	};
+
+	aliases {
+		watchdog0 = &wdt31;
+		lora-ant-sw = &lora_ant_sw;
+		lora-transceiver = &lora_rak_sx1262;
+	};
+};
+
+&cpuapp_sram {
+	status = "okay";
+};
+
+&grtc {
+	owned-channels = <0 1 2 3 4 5 6 7 8 9 10 11>;
+	/* Channels 7-11 reserved for Zero Latency IRQs, 3-4 for FLPR */
+	child-owned-channels = <3 4 7 8 9 10 11>;
+	status = "okay";
+};
+
+&clock {
+	status = "okay";
+};
+
+/* UART0 - console */
+&uart21 {
+	status = "okay";
+};
+
+/* UART1 - secondary */
+&uart20 {
+	status = "okay";
+};
+
+/* I2C */
+&i2c30 {
+	status = "okay";
+};
+
+/* LoRa SPI + onboard SX1262 */
+&rak_lora_spi {
+	status = "okay";
+	overrun-character = <0>;
+	cs-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>; /* CS = P1.12 */
+
+	lora_rak_sx1262: lora@0 {
+		compatible = "semtech,sx1262-new";
+		reg = <0>;
+		spi-max-frequency = <DT_FREQ_M(4)>;
+
+		reset-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>; /* RESET = P0.04 */
+		busy-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>; /* BUSY = P1.13 */
+		dio1-gpios = <&gpio0 1 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>; /* DIO1 = P0.01 */
+
+		dio2-as-rf-switch;
+		dio3-as-tcxo-control;
+		tcxo-voltage = <SX126X_TCXO_SUPPLY_1_8V>;
+		tcxo-wakeup-time = <6>; /* ms */
+		rx-boosted;
+		reg-mode = <SX126X_REG_MODE_DCDC>;
+	};
+};
+
+/* External/reserved SPI - CS P2.05 controlled by application */
+&spi00 {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&gpio2 {
+	status = "okay";
+};
+
+&gpiote20 {
+	status = "okay";
+};
+
+&gpiote30 {
+	status = "okay";
+};
+
+&nfct {
+	status = "okay";
+};
+
+&adc {
+	status = "okay";
+};
+
+&regulators {
+	status = "okay";
+};
+
+&vregmain {
+	status = "okay";
+	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
+};
+
+/* HFXO - 32 MHz crystal; load-capacitance-femtofarad: 4000–17000, step 250 */
+&hfxo {
+	status = "okay";
+	load-capacitors = "internal";
+	load-capacitance-femtofarad = <5000>;
+};
+
+&lfxo {
+	load-capacitors = "internal";
+	load-capacitance-femtofarad = <8000>;
+	status = "okay";
+};
+
+&cpuapp_rram {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x0 DT_SIZE_K(64)>;
+		};
+
+		slot0_partition: partition@10000 {
+			label = "image-0";
+			reg = <0x10000 DT_SIZE_K(664)>;
+		};
+
+		slot1_partition: partition@b6000 {
+			label = "image-1";
+			reg = <0xb6000 DT_SIZE_K(664)>;
+		};
+
+		storage_partition: partition@15c000 {
+			label = "storage";
+			reg = <0x15c000 DT_SIZE_K(36)>;
+		};
+	};
+};

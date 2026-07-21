@@ -1,0 +1,9 @@
+board:
+  name: rak3162
+  full_name: RAK3162
+  vendor: rak
+  socs:
+  - name: nrf54l15
+    variants:
+    - name: xip
+      cpucluster: cpuflpr

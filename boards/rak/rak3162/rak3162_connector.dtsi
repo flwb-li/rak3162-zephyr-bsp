@@ -1,0 +1,18 @@
+/*
+ * Copyright (c) 2026 RAK Wireless
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * RAK3162 bus aliases for applications and overlays.
+ */
+
+/* LoRa radio SPI bus (onboard SX1262) */
+rak_lora_spi: &spi22 {};
+
+/* External/reserved SPI bus */
+rak_ext_spi: &spi00 {};
+
+/* User I2C bus */
+rak_i2c: &i2c30 {};
+
+/* Secondary UART */
+rak_uart: &uart21 {};

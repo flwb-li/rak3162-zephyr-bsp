@@ -1,0 +1,9 @@
+# RAK Wireless RAK3162 - J-Link OB / CMSIS-DAP debugger udev rules
+# Replace idVendor / idProduct with the actual values from your debug probe:
+#   lsusb -v | grep -A5 "J-Link\|CMSIS"
+#
+# J-Link generic rule (SEGGER):
+SUBSYSTEM=="usb", ATTR{idVendor}=="1366", MODE:="0666", GROUP:="plugdev"
+
+# If you share your system with other users, replace MODE:="0666" with
+# OWNER:="yourusername" or GROUP:="plugdev" and manage via unix groups.
