@@ -1,8 +1,11 @@
 #include "at/hw_at.h"
+#include "lora/hw_lora_p2p.h"
 #include "storage/hw_storage.h"
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -13,6 +16,16 @@ static void param_error(void)
 	hw_at_resp_line("AT_PARAM_ERROR");
 }
 
+static void busy_error(void)
+{
+	hw_at_resp_line("AT_BUSY_ERROR");
+}
+
+static void resp_line_at_value(const char *name, const char *value)
+{
+	hw_at_resp_line("AT+%s=%s", name, value);
+}
+
 static bool hex_valid(const char *s, size_t exact_len)
 {
 	if ((s == NULL) || (strlen(s) != exact_len)) {
@@ -20,6 +33,17 @@ static bool hex_valid(const char *s, size_t exact_len)
 	}
 
 	for (size_t i = 0; i < exact_len; i++) {
+		if (isxdigit((unsigned char)s[i]) == 0) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static bool hex_valid_n(const char *s, size_t n)
+{
+	for (size_t i = 0; i < n; i++) {
 		if (isxdigit((unsigned char)s[i]) == 0) {
 			return false;
 		}
@@ -170,4 +194,235 @@ int hw_at_cmd_appeui(const struct hw_at_request *req)
 
 	param_error();
 	return -EINVAL;
+}
+
+int hw_at_cmd_p2p(const struct hw_at_request *req)
+{
+	char buf[128];
+
+	if (req->form == HW_AT_FORM_HELP) {
+		hw_at_resp_line("Description: View/set P2P parameters in RAM only");
+		hw_at_resp_line("AT+P2P / AT+P2P=?  View current value");
+		hw_at_resp_line("AT+P2P=<freq>:<sf>:<bw>:<cr>:<preamble>:<tx_power>");
+		hw_at_resp_line("BW: 0/125 1/250 2/500 (Zephyr LoRa)");
+		hw_at_resp_line("CR: 0=4/5 1=4/6 2=4/7 3=4/8");
+		hw_at_resp_line("Default: 868000000:7:125:0:8:14");
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	if ((req->form == HW_AT_FORM_GET) || (req->form == HW_AT_FORM_EXEC)) {
+		if (hw_lora_p2p_params_format(buf, sizeof(buf)) != 0) {
+			hw_at_resp_error(NULL);
+			return -EIO;
+		}
+		resp_line_at_value("P2P", buf);
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	if (req->form == HW_AT_FORM_SET) {
+		int s;
+
+		if ((req->args == NULL) || (req->args[0] == '\0')) {
+			param_error();
+			return -EINVAL;
+		}
+
+		s = hw_lora_p2p_params_set(req->args);
+		if (s == -EBUSY) {
+			busy_error();
+			return -EBUSY;
+		}
+		if (s != 0) {
+			param_error();
+			return -EINVAL;
+		}
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	param_error();
+	return -EINVAL;
+}
+
+int hw_at_cmd_precv(const struct hw_at_request *req)
+{
+	char buf[32];
+
+	if (req->form == HW_AT_FORM_HELP) {
+		hw_at_resp_line("Description: P2P receive mode");
+		hw_at_resp_line("AT+PRECV=? : get current PRECV value");
+		hw_at_resp_line("AT+PRECV=<time>");
+		hw_at_resp_line("0 stop; 1..65532 timed ms; 65533 cont+TX;");
+		hw_at_resp_line("65534 cont locked; 65535 until one packet");
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	if ((req->form == HW_AT_FORM_GET) || (req->form == HW_AT_FORM_EXEC)) {
+		(void)snprintf(buf, sizeof(buf), "%u", (unsigned int)hw_lora_p2p_recv_get());
+		resp_line_at_value("PRECV", buf);
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	if (req->form != HW_AT_FORM_SET) {
+		param_error();
+		return -EINVAL;
+	}
+
+	if ((req->args == NULL) || (req->args[0] == '\0')) {
+		param_error();
+		return -EINVAL;
+	}
+
+	{
+		char *end = NULL;
+		unsigned long value;
+		int s;
+
+		errno = 0;
+		value = strtoul(req->args, &end, 10);
+		if ((errno != 0) || (end == req->args) || (*end != '\0') || (value > 65535UL)) {
+			param_error();
+			return -EINVAL;
+		}
+
+		s = hw_lora_p2p_recv_set((uint16_t)value);
+		if (s == -EBUSY) {
+			busy_error();
+			return -EBUSY;
+		}
+		if (s == -EINVAL) {
+			param_error();
+			return -EINVAL;
+		}
+		if (s != 0) {
+			hw_at_resp_error(NULL);
+			return s;
+		}
+	}
+
+	hw_at_resp_ok();
+	return 0;
+}
+
+int hw_at_cmd_psend(const struct hw_at_request *req)
+{
+	uint8_t out[256];
+	size_t olen;
+	size_t hexlen;
+
+	if (req->form == HW_AT_FORM_HELP) {
+		hw_at_resp_line("Description: P2P send hex payload");
+		hw_at_resp_line("AT+PSEND=<hex>");
+		hw_at_resp_line("Payload: 2..500 hex chars, even length, 1..256 bytes");
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	if (req->form != HW_AT_FORM_SET) {
+		param_error();
+		return -EINVAL;
+	}
+
+	if (req->args == NULL) {
+		param_error();
+		return -EINVAL;
+	}
+
+	hexlen = strlen(req->args);
+	if ((hexlen < 2U) || (hexlen > 500U) || ((hexlen & 1U) != 0U)) {
+		param_error();
+		return -EINVAL;
+	}
+
+	if (!hex_valid_n(req->args, hexlen)) {
+		param_error();
+		return -EINVAL;
+	}
+
+	olen = hexlen / 2U;
+	if ((olen < 1U) || (olen > 256U)) {
+		param_error();
+		return -EINVAL;
+	}
+
+	if (hex2bin(req->args, hexlen, out, sizeof(out)) != olen) {
+		param_error();
+		return -EINVAL;
+	}
+
+	{
+		int s = hw_lora_p2p_send_payload(out, olen);
+
+		if (s == -EBUSY) {
+			busy_error();
+			return -EBUSY;
+		}
+		if (s == -EINVAL) {
+			param_error();
+			return -EINVAL;
+		}
+		if (s != 0) {
+			hw_at_resp_error(NULL);
+			return s;
+		}
+	}
+
+	hw_at_resp_ok();
+	return 0;
+}
+
+int hw_at_cmd_cw(const struct hw_at_request *req)
+{
+	char buf[48];
+
+	if (req->form == HW_AT_FORM_HELP) {
+		hw_at_resp_line("AT+CW=<freq>:<power>:<time_ms> start continuous wave");
+		hw_at_resp_line("time_ms=0 => long-running CW (driver uses seconds)");
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	if (req->form == HW_AT_FORM_GET) {
+		if (hw_lora_cw_format(buf, sizeof(buf)) != 0) {
+			hw_at_resp_error(NULL);
+			return -EIO;
+		}
+		resp_line_at_value("CW", buf);
+		hw_at_resp_ok();
+		return 0;
+	}
+
+	if (req->form != HW_AT_FORM_SET) {
+		param_error();
+		return -EINVAL;
+	}
+
+	if ((req->args == NULL) || (req->args[0] == '\0')) {
+		param_error();
+		return -EINVAL;
+	}
+
+	{
+		int s = hw_lora_cw_start(req->args);
+
+		if (s == -EBUSY) {
+			busy_error();
+			return -EBUSY;
+		}
+		if (s == -EINVAL) {
+			param_error();
+			return -EINVAL;
+		}
+		if (s != 0) {
+			hw_at_resp_error(NULL);
+			return s;
+		}
+	}
+
+	hw_at_resp_ok();
+	return 0;
 }

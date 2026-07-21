@@ -70,6 +70,10 @@ void hw_at_init(void);
 
 int hw_at_cmd_deveui(const struct hw_at_request *req);
 int hw_at_cmd_appeui(const struct hw_at_request *req);
+int hw_at_cmd_p2p(const struct hw_at_request *req);
+int hw_at_cmd_precv(const struct hw_at_request *req);
+int hw_at_cmd_psend(const struct hw_at_request *req);
+int hw_at_cmd_cw(const struct hw_at_request *req);
 int hw_at_cmd_appkey(const struct hw_at_request *req);
 int hw_at_cmd_nwkkey(const struct hw_at_request *req);
 int hw_at_cmd_join(const struct hw_at_request *req);

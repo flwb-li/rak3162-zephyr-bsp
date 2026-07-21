@@ -6,16 +6,18 @@ Based on **Zephyr v4.3.0** and West.
 **Repository:** https://github.com/flwb-li/rak3162-zephyr-bsp
 
 SX1262 is part of the board device tree — **no `--shield` is required**.
-LoRaWAN uses Zephyr **`CONFIG_LORAWAN`** (loramac-node). There is **no Semtech USP** dependency.
+LoRaWAN uses Zephyr **`CONFIG_LORAWAN`** (loramac-node). LoRa P2P uses Zephyr **`CONFIG_LORA`** (`AT+P2P` / `PRECV` / `PSEND` / `CW`). There is **no Semtech USP** dependency.
+P2P and LoRaWAN share the same radio: stop P2P (`AT+PRECV=0`) before `AT+JOIN`; after join, P2P returns `AT_BUSY_ERROR`.
 
 ## Contents
 
 | Path | Description |
 |------|-------------|
 | `boards/rak3162/` | Board support (DTS includes onboard SX1262 as `semtech,sx1262`) |
-| `samples/hw_test/` | Single sample: AT console + LoRaWAN OTAA Class A |
+| `samples/hw_test/` | Single sample: AT console + LoRa P2P + LoRaWAN OTAA Class A |
 | `zephyr/module.yml` | Registers this tree as a Zephyr module (`board_root`) |
 | `west.yml` | West manifest (Zephyr v4.3.0 only) |
+| `scripts/bootstrap.sh` | Mode 1: fetch Zephyr/modules (+ optional SDK) for this BSP |
 | `scripts/install_into_zephyr.sh` | Mode 2: copy boards/samples into an existing Zephyr tree |
 | `scripts/uninstall_from_zephyr.sh` | Mode 2: remove installed files |
 
@@ -28,9 +30,42 @@ LoRaWAN uses Zephyr **`CONFIG_LORAWAN`** (loramac-node). There is **no Semtech U
 
 ## Mode 1 — West module / manifest (recommended)
 
+### One-shot bootstrap (customers)
+
+Clone this repository so the folder name is `rak3162-zephyr-bsp`, then run:
+
+```bash
+# example layout before bootstrap:
+#   ~/rak3162-workspace/rak3162-zephyr-bsp/   <-- this repo
+
+cd rak3162-zephyr-bsp
+./scripts/bootstrap.sh
+# options: --no-sdk  --sdk-dir DIR  --workspace DIR  --build  --full
+```
+
+The script will:
+
+1. Create/use a west workspace in the **parent** directory
+2. `west update` Zephyr **v4.3.0** and modules
+3. Install Zephyr Python requirements
+4. Download/install Zephyr SDK **0.17.x** if missing (skip with `--no-sdk`)
+5. Print the build commands (or build immediately with `--build`)
+
+Then:
+
+```bash
+cd ..   # workspace root
+source zephyr/zephyr-env.sh
+export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-0.17.4
+west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/hw_test --no-sysbuild --pristine always
+west flash
+```
+
+### Manual west init
+
 ```bash
 mkdir rak3162-workspace && cd rak3162-workspace
-west init -m git@github.com:flwb-li/rak3162-zephyr-bsp.git --mr main rak3162-zephyr-bsp
+west init -m https://github.com/flwb-li/rak3162-zephyr-bsp.git --mr main rak3162-zephyr-bsp
 cd rak3162-zephyr-bsp
 west update -o=--depth=1 -n
 west zephyr-export

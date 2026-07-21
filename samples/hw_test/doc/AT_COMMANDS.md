@@ -1,7 +1,9 @@
 # RAK3162 HW_TEST AT 指令说明
 
 本文档描述 `samples/hw_test` 固件支持的 AT 指令。  
-适用板卡：**RAK3162**（`rak3162/nrf54l15/cpuapp`），板载 SX1262，协议栈为 Zephyr **LoRaWAN / loramac-node**（`CONFIG_LORAWAN`）。默认区域 **EU868**。
+适用板卡：**RAK3162**（`rak3162/nrf54l15/cpuapp`），板载 SX1262。  
+支持 **LoRa P2P**（Zephyr `CONFIG_LORA`）与 **LoRaWAN / loramac-node**（`CONFIG_LORAWAN`）。默认区域 **EU868**。  
+P2P 与 LoRaWAN **共用射频**：`AT+JOIN` 前需 `AT+PRECV=0`；LoRaWAN 已启动后 P2P 返回 `AT_BUSY_ERROR`。
 
 ---
 
@@ -44,11 +46,14 @@
 
 部分命令会先输出信息行，再输出 `OK`。
 
-LoRaWAN 异步/事件行示例：
+LoRa 异步/事件行示例：
 
+- `+EVT:TXP2P DONE` — P2P 发送完成
+- `+EVT:RXP2P RECEIVE TIMEOUT` — P2P 接收超时
+- `+EVT:RXP2P:<rssi>:<snr>:<hex>` — P2P 收到数据
 - `+EVT:JOIN_START` / `+EVT:JOINED` / `+EVT:JOIN_FAILED,<err>`
 - `+EVT:SEND_OK`
-- `+EVT:RX,PORT=...,RSSI=...,SNR=...,LEN=...,DATA=<hex>` — 下行（任意端口）
+- `+EVT:RX,PORT=...,RSSI=...,SNR=...,LEN=...,DATA=<hex>` — LoRaWAN 下行
 
 上电**不会自动 join**，需主机执行 `AT+JOIN`。
 
@@ -84,11 +89,51 @@ LoRaWAN 异步/事件行示例：
 
 ---
 
-## 5. LoRaWAN OTAA（Class A）
+## 5. LoRa P2P（Zephyr LoRa / SX1262）
+
+P2P 参数保存在 **RAM**，复位后恢复默认值。默认：`868000000:7:125:0:8:14`。
+
+### 5.1 `AT+P2P` — 射频参数
+
+| 项目 | 说明 |
+|------|------|
+| 查看 | `AT+P2P` 或 `AT+P2P=?` |
+| 设置 | `AT+P2P=<freq>:<sf>:<bw>:<cr>:<preamble>:<tx_power>` |
+
+| 字段 | 范围 | 说明 |
+|------|------|------|
+| `freq` | 150000000–960000000 | Hz |
+| `sf` | 6–12 | 扩频因子 |
+| `bw` | `0`/`125`, `1`/`250`, `2`/`500` | 带宽（kHz；Zephyr 仅支持这三档） |
+| `cr` | 0–3 | 0=4/5 … 3=4/8 |
+| `preamble` | 2–65535 | 前导码 |
+| `tx_power` | 5–22 | dBm |
+
+### 5.2 `AT+PRECV` — 接收
+
+| `time` | 含义 |
+|--------|------|
+| `0` | 停止接收 |
+| `1`–`65532` | 接收窗口（ms） |
+| `65533` | 持续接收，仍允许 `PSEND` |
+| `65534` | 持续接收，需 `AT+PRECV=0` 退出 |
+| `65535` | 收到一包后自动结束 |
+
+### 5.3 `AT+PSEND` — 发送
+
+`AT+PSEND=<hex>`，偶数长度十六进制，1–256 字节。完成后：`+EVT:TXP2P DONE`。
+
+### 5.4 `AT+CW` — 连续波
+
+`AT+CW=<freq>:<power>:<time_ms>`。底层驱动超时单位为**秒**（`time_ms` 向上取整；`0` 表示长时间发射）。
+
+---
+
+## 6. LoRaWAN OTAA（Class A）
 
 凭证与密钥持久化到 Settings。默认区域 EU868（见 `prj.conf` 中 `CONFIG_LORAMAC_REGION_*`）。
 
-### 5.1 凭证
+### 6.1 凭证
 
 | 命令 | 长度 | 说明 |
 |------|------|------|
@@ -106,13 +151,13 @@ AT+APPKEY=2B7E151628AED2A6ABF7158809CF4F3C
 AT+APPKEY=?
 ```
 
-### 5.2 `AT+JOIN` — OTAA 入网
+### 6.2 `AT+JOIN` — OTAA 入网
 
 | 项目 | 说明 |
 |------|------|
 | 执行 | `AT+JOIN` — `lorawan_start`（若未启）+ `lorawan_join(OTAA)` |
 | 查询 | `AT+JOIN=?` — `joined` / `idle` |
-| 前置 | 已设置 DEVEUI、APPEUI、APPKEY |
+| 前置 | 已设置 DEVEUI、APPEUI、APPKEY；P2P 已停止 |
 
 成功示例：
 
@@ -122,7 +167,7 @@ AT+APPKEY=?
 OK
 ```
 
-### 5.3 `AT+SEND` — 上行
+### 6.3 `AT+SEND` — 上行
 
 | 项目 | 说明 |
 |------|------|
@@ -142,11 +187,11 @@ OK
 
 未 join 时返回 `AT_ERROR: not joined`。
 
-### 5.4 `AT+CLASS=?` — 查询 Class
+### 6.4 `AT+CLASS=?` — 查询 Class
 
 本 sample 仅 Class A，查询返回 `AT+CLASS=A`。
 
-### 5.5 下行
+### 6.5 下行
 
 栈在 join 前注册下行回调。收到数据时串口打印：
 
@@ -156,9 +201,9 @@ OK
 
 ---
 
-## 6. 低功耗
+## 7. 低功耗
 
-### 6.1 `AT+RTC` / `AT+SLEEP`
+### 7.1 `AT+RTC` / `AT+SLEEP`
 
 | 命令 | 说明 |
 |------|------|
@@ -167,9 +212,9 @@ OK
 
 ---
 
-## 7. 外设与 BLE 测试
+## 8. 外设与 BLE 测试
 
-### 7.1 `AT+TEST`
+### 8.1 `AT+TEST`
 
 | 子命令 | 功能 |
 |--------|------|
@@ -177,13 +222,26 @@ OK
 | `BLE` | BLE 广播 |
 | `GRTC` / `GRTCSTOP` | GRTC 方波（需 overlay） |
 
-### 7.2 `AT+BLECW` / `AT+BLECWSTOP`
+### 8.2 `AT+BLECW` / `AT+BLECWSTOP`
 
 BLE 单载波（RADIO 外设）。`AT+BLECW=<ch>[,<pwr_dbm>]`，信道频率 = 2400 + ch MHz。
 
 ---
 
-## 8. 典型流程：密钥 → JOIN → SEND → 下行
+## 9. 典型流程
+
+### 9.1 P2P
+
+```text
+AT+P2P=868000000:7:125:0:8:14
+AT+PRECV=65535
+# 对端：
+AT+PSEND=48656C6C6F
+# 本端：
+# +EVT:RXP2P:<rssi>:<snr>:48656C6C6F
+```
+
+### 9.2 LoRaWAN：密钥 → JOIN → SEND → 下行
 
 ```text
 AT
@@ -199,7 +257,7 @@ AT+SEND=2,48656C6C6F,c
 
 ---
 
-## 9. 构建
+## 10. 构建
 
 ```bash
 west build -b rak3162/nrf54l15/cpuapp samples/hw_test --no-sysbuild
@@ -209,7 +267,7 @@ west build -b rak3162/nrf54l15/cpuapp samples/hw_test --no-sysbuild
 
 ---
 
-## 10. 命令速查表
+## 11. 命令速查表
 
 | 命令 | 类型 | 持久化 |
 |------|------|--------|
@@ -217,6 +275,7 @@ west build -b rak3162/nrf54l15/cpuapp samples/hw_test --no-sysbuild
 | `AT+VER` / `AT+BUILDTIME` | 只读 | — |
 | `AT+SN` | 读写 | 是 |
 | `AT+HFXOCAP` / `AT+LFXOCAP` | 读写 | 是 |
+| `AT+P2P` / `AT+PRECV` / `AT+PSEND` / `AT+CW` | LoRa P2P | RAM |
 | `AT+DEVEUI` / `AT+APPEUI` / `AT+APPKEY` / `AT+NWKKEY` | 读写 | 是 |
 | `AT+JOIN` / `AT+SEND` / `AT+CLASS` | LoRaWAN | — |
 | `AT+SLEEP` / `AT+RTC` | 低功耗 | RTC 仅 RAM |
