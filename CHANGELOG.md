@@ -7,7 +7,7 @@ Customer preview BSP for RAK3162. Format based on [Keep a Changelog](https://kee
 ### Added
 
 - Customer preview tree at this repository root
-- Onboard SX1262 in `boards/rak/rak3162` device tree (no shield)
+- Onboard SX1262 in `boards/rak3162` device tree (no shield)
 - Mode 1: West manifest (`west.yml`) + Zephyr module (`zephyr/module.yml`)
 - Mode 2: `scripts/install_into_zephyr.sh` / `uninstall_from_zephyr.sh`
 - `samples/hw_test` hardware test application

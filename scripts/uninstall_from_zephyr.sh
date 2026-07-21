@@ -37,7 +37,7 @@ fi
 ZEPHYR_BASE="$(cd "${ZEPHYR_BASE}" && pwd)"
 MARKER="${ZEPHYR_BASE}/.rak3162_bsp_installed"
 MANIFEST="${ZEPHYR_BASE}/.rak3162_bsp_manifest.txt"
-DST_BOARD="${ZEPHYR_BASE}/boards/rak/rak3162"
+DST_BOARD="${ZEPHYR_BASE}/boards/rak3162"
 DST_SAMPLE="${ZEPHYR_BASE}/samples/rak/hw_test"
 
 if [[ ! -f "${MARKER}" && ! -d "${DST_BOARD}" && ! -d "${DST_SAMPLE}" ]]; then

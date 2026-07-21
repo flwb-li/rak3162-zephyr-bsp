@@ -15,7 +15,7 @@ ZEPHYR_BASE=""
 
 usage() {
 	echo "Usage: $0 <ZEPHYR_BASE> [--force] [--dry-run]"
-	echo "  Copies boards/rak/rak3162 and samples into the Zephyr tree."
+	echo "  Copies boards/rak3162 and samples into the Zephyr tree."
 	echo "  SX1262 is onboard in the board DTS (no shield required)."
 }
 
@@ -56,8 +56,8 @@ if [[ -f "${MARKER}" && "${FORCE}" -ne 1 ]]; then
 	exit 1
 fi
 
-SRC_BOARD="${BSP_ROOT}/boards/rak/rak3162"
-DST_BOARD="${ZEPHYR_BASE}/boards/rak/rak3162"
+SRC_BOARD="${BSP_ROOT}/boards/rak3162"
+DST_BOARD="${ZEPHYR_BASE}/boards/rak3162"
 SRC_SAMPLE="${BSP_ROOT}/samples/hw_test"
 DST_SAMPLE="${ZEPHYR_BASE}/samples/rak/hw_test"
 
@@ -70,7 +70,7 @@ run() {
 }
 
 echo "Installing RAK3162 BSP into ${ZEPHYR_BASE}"
-run mkdir -p "${ZEPHYR_BASE}/boards/rak" "${ZEPHYR_BASE}/samples/rak"
+run mkdir -p "${ZEPHYR_BASE}/boards" "${ZEPHYR_BASE}/samples/rak"
 run rm -rf "${DST_BOARD}" "${DST_SAMPLE}"
 run cp -a "${SRC_BOARD}" "${DST_BOARD}"
 run cp -a "${SRC_SAMPLE}" "${DST_SAMPLE}"

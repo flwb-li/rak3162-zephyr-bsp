@@ -11,7 +11,7 @@ SX1262 is part of the board device tree — **no `--shield` is required**.
 
 | Path | Description |
 |------|-------------|
-| `boards/rak/rak3162/` | Board support (DTS includes onboard SX1262) |
+| `boards/rak3162/` | Board support (DTS includes onboard SX1262) |
 | `samples/hw_test/` | Hardware test firmware (AT commands, LoRa, BLE CW, …) |
 | `zephyr/module.yml` | Registers this tree as a Zephyr module (`board_root`) |
 | `west.yml` | West manifest (Zephyr + Semtech USP) |
@@ -90,13 +90,13 @@ Uninstall:
 
 ## Onboard SX1262
 
-Radio is defined in `boards/rak/rak3162/rak3162_nrf54l15_cpuapp.dts` (SPI `spi22` / `rak_lora_spi`, CS P1.12, RESET P0.04, BUSY P1.13, DIO1 P0.01, DIO2 RF switch, DIO3 TCXO).
+Radio is defined in `boards/rak3162/rak3162_nrf54l15_cpuapp.dts` (SPI `spi22` / `rak_lora_spi`, CS P1.12, RESET P0.04, BUSY P1.13, DIO1 P0.01, DIO2 RF switch, DIO3 TCXO).
 
 Do **not** pass `--shield rak_sx1262`.
 
 ## Serial and pins
 
-See `doc/hardware_pins.md` and `boards/rak/rak3162/doc/hardware_pins.md`.
+See `doc/hardware_pins.md` and `boards/rak3162/doc/hardware_pins.md`.
 AT command reference: `samples/hw_test/doc/AT_COMMANDS.md`.
 
 ## Semtech USP
