@@ -9,7 +9,14 @@ manifest:
       remote: zephyrproject
       repo-path: zephyr
       revision: v4.3.0
-      import: true
+      # Only modules required to build RAK3162 samples/hw_test
+      # (nRF54L15 + LoRaWAN loramac-node + onboard SX1262).
+      import:
+        name-allowlist:
+          - cmsis_6
+          - cmsis
+          - hal_nordic
+          - loramac-node
 
   self:
     path: rak3162-zephyr-bsp

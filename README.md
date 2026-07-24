@@ -16,47 +16,51 @@ P2P and LoRaWAN share the same radio: stop P2P (`AT+PRECV=0`) before `AT+JOIN`; 
 | `boards/rak3162/` | Board support (DTS includes onboard SX1262 as `semtech,sx1262`) |
 | `samples/hw_test/` | Single sample: AT console + LoRa P2P + LoRaWAN OTAA Class A |
 | `zephyr/module.yml` | Registers this tree as a Zephyr module (`board_root`) |
-| `west.yml` | West manifest (Zephyr v4.3.0 only) |
+| `west.yml` | West manifest (Zephyr v4.3.0 + minimal modules) |
 | `scripts/bootstrap.sh` | Mode 1: fetch Zephyr/modules (+ optional SDK) for this BSP |
 | `scripts/install_into_zephyr.sh` | Mode 2: copy boards/samples into an existing Zephyr tree |
 | `scripts/uninstall_from_zephyr.sh` | Mode 2: remove installed files |
 
 ## Requirements
 
-- Python 3.10+
-- [West](https://docs.zephyrproject.org/latest/develop/west/index.html)
-- Zephyr SDK **0.17.x** (matches Zephyr 4.3)
-- Serial tool at **115200** baud
+On a **clean** machine (no Zephyr / west / SDK preinstalled):
+
+- `git`, `python3` **3.10+**, `cmake`, `ninja`, `wget` or `curl`, `tar`
+- Network access to GitHub (Zephyr + SDK download)
+
+`./scripts/bootstrap.sh` installs west, Python deps, and Zephyr SDK into the workspace.
 
 ## Mode 1 — West module / manifest (recommended)
 
-### One-shot bootstrap (customers)
+### One-shot bootstrap (customers, clean PC)
 
-Clone this repository so the folder name is `rak3162-zephyr-bsp`, then run:
+No prior Zephyr environment is required. Clone this repo as folder `rak3162-zephyr-bsp`, then:
 
 ```bash
-# example layout before bootstrap:
-#   ~/rak3162-workspace/rak3162-zephyr-bsp/   <-- this repo
+mkdir ~/rak3162-workspace && cd ~/rak3162-workspace
+git clone https://github.com/flwb-li/rak3162-zephyr-bsp.git rak3162-zephyr-bsp
 
 cd rak3162-zephyr-bsp
 ./scripts/bootstrap.sh
-# options: --no-sdk  --sdk-dir DIR  --workspace DIR  --build  --full
+# options: --no-sdk  --sdk-dir DIR  --workspace DIR  --build  --retries N
 ```
 
 The script will:
 
-1. Create/use a west workspace in the **parent** directory
-2. `west update` Zephyr **v4.3.0** and modules
-3. Install Zephyr Python requirements
-4. Download/install Zephyr SDK **0.17.x** if missing (skip with `--no-sdk`)
-5. Print the build commands (or build immediately with `--build`)
+1. Clear any inherited `ZEPHYR_*` variables from the shell
+2. Create a workspace-local Python venv (`.venv`) and install `west` there
+3. Initialize a west workspace in the **parent** directory
+4. Fetch **Zephyr v4.3.0** + allowlisted modules only: `cmsis`, `cmsis_6`, `hal_nordic`, `loramac-node`  
+   (network steps retry up to **5** times with backoff; override with `--retries N`)
+5. Install Zephyr Python requirements into `.venv`
+6. Download Zephyr SDK **0.17.x** into `<workspace>/zephyr-sdk-0.17.4` (skip with `--no-sdk`)
+7. Write `<workspace>/env.sh` for later builds
 
-Then:
+Then (every new terminal):
 
 ```bash
-cd ..   # workspace root
-source zephyr/zephyr-env.sh
-export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-0.17.4
+cd ~/rak3162-workspace
+source ./env.sh
 west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/hw_test --no-sysbuild --pristine always
 west flash
 ```
@@ -78,10 +82,18 @@ Workspace layout after `west update`:
 
 ```
 rak3162-workspace/
+├── .venv/                            # west + Python deps (workspace-local)
+├── env.sh                            # source this before build
+├── zephyr-sdk-0.17.4/                # installed by bootstrap (default)
 ├── rak3162-zephyr-bsp/               # this BSP (manifest)
 │   ├── boards/
 │   └── samples/
-└── zephyr/                           # Zephyr v4.3.0
+├── zephyr/                           # Zephyr v4.3.0
+└── modules/
+    ├── hal/cmsis
+    ├── hal/cmsis_6
+    ├── hal/nordic
+    └── lib/loramac-node
 ```
 
 If this directory is already cloned, point west at it from the parent workspace:
