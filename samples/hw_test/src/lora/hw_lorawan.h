@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 RAKwireless Technology Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef HW_LORAWAN_H_
 #define HW_LORAWAN_H_
 

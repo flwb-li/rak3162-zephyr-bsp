@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 RAKwireless Technology Limited
+# SPDX-License-Identifier: Apache-2.0
+
 # Install RAK3162 BSP boards/samples into an existing Zephyr tree (optional).
 # Prefer Mode 2 in README: ZEPHYR_EXTRA_MODULES (no copy) when you already have Zephyr.
 # Usage:

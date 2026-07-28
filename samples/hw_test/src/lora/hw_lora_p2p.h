@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 RAKwireless Technology Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 /**
  * @file hw_lora_p2p.h
  * @brief LoRa P2P / CW helpers over Zephyr lora0 (no Semtech USP).

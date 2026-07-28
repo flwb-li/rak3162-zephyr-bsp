@@ -30,8 +30,10 @@ On a **clean** machine (no Zephyr / west / SDK preinstalled):
 
 - `git`, `python3` **3.10+**, `cmake`, `ninja`, `wget` or `curl`, `tar`
 - Network access to GitHub (Zephyr + SDK download)
+- An **SWD debug probe** to flash the module (J-Link, CMSIS-DAP / DAPLink, or another pyOCD-compatible probe)
 
 `./scripts/bootstrap.sh` installs west, Python deps, and Zephyr SDK into the workspace.
+Flash tools (pyOCD / J-Link / nRF Util) are **not** installed by bootstrap — see [Flash](#flash).
 
 There are **two** ways to use this BSP:
 
@@ -164,6 +166,68 @@ Uninstall copied files:
 ./scripts/uninstall_from_zephyr.sh /path/to/zephyr
 ```
 
+## Flash
+
+RAK3162 is programmed over **SWD** (nRF54L15). Connect a debug probe to the board’s SWD pads/header:
+Power the board (USB or external 3.3 V as applicable) before flashing. Keep SWD wires short.
+
+### Tooling
+
+Default flash runner in `boards/rak3162/board.cmake` is **pyOCD** (`--target=nrf54l`). J-Link and nRF Util are also supported.
+
+| Runner | Install | Typical use |
+|--------|---------|-------------|
+| **pyOCD** (default) | `pip install pyocd` (use the workspace `.venv` after Mode 1 bootstrap) | CMSIS-DAP / DAPLink / many low-cost probes |
+| **J-Link** | [SEGGER J-Link software](https://www.segger.com/downloads/jlink/) | SEGGER J-Link / J-Link OB |
+| **nrfutil** | [nRF Util](https://www.nordicsemi.com/Products/Development-tools/nRF-Util) | Nordic tooling / some DK setups |
+
+On Linux, install udev rules so the probe is usable without root. A starter rule is in `boards/rak3162/support/99-rak3162.rules` (J-Link vendor `1366`). Adjust `idVendor`/`idProduct` for your probe (`lsusb`), then:
+
+```bash
+sudo cp boards/rak3162/support/99-rak3162.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### Flash after build
+
+From the workspace root (after `source ./env.sh` in Mode 1):
+
+```bash
+# Uses the latest build directory (default: ./build)
+west flash
+
+# Or point at an explicit build dir
+west flash -d build
+```
+
+Select a non-default runner when needed:
+
+```bash
+west flash --runner pyocd
+west flash --runner jlink
+west flash --runner nrfutil
+```
+
+Recover / mass-erase if the chip no longer responds (probe-specific; example with nrfutil):
+
+```bash
+west flash --runner nrfutil --erase
+```
+
+### Serial console (after flash)
+
+AT console is on **UART20** (Zephyr console): **115200 8N1**, **TX=P1.06**, **RX=P1.07**.
+
+Connect a USB–UART adapter (3.3 V logic), open a terminal, and reset the board. You should see boot logs and can type AT commands:
+
+```text
+AT
+AT+VER=?
+```
+
+Full AT list: `samples/hw_test/doc/AT_COMMANDS.md`.  
+Pin tables: `doc/hardware_pins.md` and `boards/rak3162/doc/hardware_pins.md`.
+
 ## LoRaWAN region
 
 Default **`AT+BAND=4` (EU868)**. Multiple `CONFIG_LORAMAC_REGION_*` are enabled in `samples/hw_test/prj.conf` so `AT+BAND` can switch region **before** the first `AT+JOIN`. AS923-2/3/4 and LA915 are not available in Zephyr.
@@ -172,13 +236,9 @@ Default **`AT+BAND=4` (EU868)**. Multiple `CONFIG_LORAMAC_REGION_*` are enabled 
 
 Radio is defined in `boards/rak3162/rak3162_nrf54l15_cpuapp.dts` (SPI `spi22` / `rak_lora_spi`, CS P1.12, RESET P0.04, BUSY P1.13, DIO1 P0.01, DIO2 RF switch, DIO3 TCXO). Alias: `lora0`.
 
-Do **not** pass `--shield rak_sx1262`.
-
-## Serial and pins
-
-See `doc/hardware_pins.md` and `boards/rak3162/doc/hardware_pins.md`.
-AT command reference: `samples/hw_test/doc/AT_COMMANDS.md`.
-
 ## Version
 
 **1.0.0** — see [CHANGELOG.md](CHANGELOG.md). This BSP is **not** yet upstreamed into Zephyr.
+
+## License
+Copyright (c) 2026 RAKwireless Technology Limited.

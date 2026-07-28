@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 RAKwireless Technology Limited
+# SPDX-License-Identifier: Apache-2.0
+
 # Bootstrap a self-contained RAK3162 Zephyr workspace for customers.
 #
 # Designed for a machine with *no* prior Zephyr / west / SDK setup.
