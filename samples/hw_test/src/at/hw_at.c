@@ -504,6 +504,14 @@ void hw_at_init(void)
     (void)hw_at_register_command("CW", hw_at_cmd_cw, "AT+CW");
     (void)hw_at_register_command("APPKEY", hw_at_cmd_appkey, "AT+APPKEY");
     (void)hw_at_register_command("NWKKEY", hw_at_cmd_nwkkey, "AT+NWKKEY");
+    (void)hw_at_register_command("NWM", hw_at_cmd_nwm, "AT+NWM");
+    (void)hw_at_register_command("BAND", hw_at_cmd_band, "AT+BAND");
+    (void)hw_at_register_command("CFM", hw_at_cmd_cfm, "AT+CFM");
+    (void)hw_at_register_command("CFS", hw_at_cmd_cfs, "AT+CFS");
+    (void)hw_at_register_command("NJS", hw_at_cmd_njs, "AT+NJS");
+    (void)hw_at_register_command("NJM", hw_at_cmd_njm, "AT+NJM");
+    (void)hw_at_register_command("ADR", hw_at_cmd_adr, "AT+ADR");
+    (void)hw_at_register_command("RECV", hw_at_cmd_recv, "AT+RECV");
     (void)hw_at_register_command("JOIN", hw_at_cmd_join, "AT+JOIN");
     (void)hw_at_register_command("SEND", hw_at_cmd_send, "AT+SEND");
     (void)hw_at_register_command("CLASS", hw_at_cmd_class, "AT+CLASS");

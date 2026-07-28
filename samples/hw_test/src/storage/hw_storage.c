@@ -17,11 +17,35 @@ struct hw_storage_state {
 
 static struct hw_storage_state storage_state;
 
+void hw_storage_apply_lw_defaults(struct hw_runtime_cfg *cfg)
+{
+	if (cfg == NULL) {
+		return;
+	}
+
+	if ((cfg->valid_mask & HW_RUNTIME_CFG_VALID_LW_OPTS) != 0U) {
+		return;
+	}
+
+	cfg->nwm = HW_NWM_LORAWAN;
+	cfg->band = HW_BAND_EU868;
+	cfg->cfm = 0U;
+	cfg->adr = 1U;
+	cfg->join_cmd = 1U;
+	cfg->join_auto = 0U;
+	cfg->join_interval_s = 8U;
+	cfg->join_attempts = 0U;
+	cfg->valid_mask |= HW_RUNTIME_CFG_VALID_LW_OPTS;
+}
+
 static void sanitize_cfg(struct hw_runtime_cfg *cfg)
 {
-    if (cfg != NULL) {
-        cfg->sn[HW_SN_LEN] = '\0';
-    }
+	if (cfg == NULL) {
+		return;
+	}
+
+	cfg->sn[HW_SN_LEN] = '\0';
+	hw_storage_apply_lw_defaults(cfg);
 }
 
 static int save_active_cfg(const struct hw_runtime_cfg *cfg)
@@ -90,10 +114,11 @@ int hw_storage_apply_pending_cfg(void)
 
 void hw_storage_get_active_cfg(struct hw_runtime_cfg *cfg)
 {
-    if (cfg != NULL) {
-        *cfg = storage_state.active_cfg;
-        sanitize_cfg(cfg);
-    }
+	if (cfg != NULL) {
+		/* Keep defaults on the stored copy so SET comparisons and persistence stay consistent. */
+		sanitize_cfg(&storage_state.active_cfg);
+		*cfg = storage_state.active_cfg;
+	}
 }
 
 void hw_storage_get_pending_cfg(struct hw_runtime_cfg *cfg, bool *valid)
