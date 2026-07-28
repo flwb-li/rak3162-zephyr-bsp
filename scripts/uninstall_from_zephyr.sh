@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 RAKwireless Technology Limited
+# SPDX-License-Identifier: Apache-2.0
+
 # Remove files previously installed by install_into_zephyr.sh.
 # Usage:
 #   ./scripts/uninstall_from_zephyr.sh /path/to/zephyr [--dry-run]

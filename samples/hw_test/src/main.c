@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 RAKwireless Technology Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <zephyr/version.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -50,7 +55,7 @@ int main(void)
 	hw_lora_p2p_init();
 	hw_lorawan_init();
 	hw_at_init();
-	LOG_INF("AT framework init done (RUI3-like P2P + LoRaWAN)");
+	LOG_INF("AT framework init done");
 
 	/* RUI3 AT+JOIN Param2: auto-join on power up */
 	hw_lorawan_autojoin_on_boot();

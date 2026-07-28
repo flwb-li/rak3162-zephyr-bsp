@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 RAKwireless Technology Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include "lora/hw_lora_p2p.h"
 
 #include "at/hw_at.h"
