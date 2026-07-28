@@ -19,10 +19,10 @@ Select mode with **`AT+NWM`** (`0`=P2P, `1`=LoRaWAN). Region via **`AT+BAND`** b
 | `boards/rak3162/` | Board support (DTS includes onboard SX1262 as `semtech,sx1262`) |
 | `samples/hw_test/` | Single sample: AT console + LoRa P2P + LoRaWAN OTAA Class A |
 | `zephyr/module.yml` | Registers this tree as a Zephyr module (`board_root`) |
-| `west.yml` | West manifest (Zephyr v4.3.0 + minimal modules) |
+| `west.yml` | West manifest (Zephyr v4.3.0 + minimal modules) — Mode 1 |
 | `scripts/bootstrap.sh` | Mode 1: fetch Zephyr/modules (+ optional SDK) for this BSP |
-| `scripts/install_into_zephyr.sh` | Mode 2: copy boards/samples into an existing Zephyr tree |
-| `scripts/uninstall_from_zephyr.sh` | Mode 2: remove installed files |
+| `scripts/install_into_zephyr.sh` | Optional: copy boards/samples into a Zephyr tree |
+| `scripts/uninstall_from_zephyr.sh` | Optional: remove files installed by the copy script |
 
 ## Requirements
 
@@ -33,9 +33,16 @@ On a **clean** machine (no Zephyr / west / SDK preinstalled):
 
 `./scripts/bootstrap.sh` installs west, Python deps, and Zephyr SDK into the workspace.
 
-## Mode 1 — West module / manifest (recommended)
+There are **two** ways to use this BSP:
 
-### One-shot bootstrap (customers, clean PC)
+| Mode | When to use |
+|------|-------------|
+| **1 — Dedicated west workspace** | Clean PC / standalone RAK3162 workspace (recommended for new users) |
+| **2 — External Zephyr module** | You already have Zephyr v4.3.0; keep BSP outside the tree |
+
+## Mode 1 — Dedicated west workspace (recommended for clean PCs)
+
+### One-shot bootstrap
 
 No prior Zephyr environment is required. Clone this repo as folder `rak3162-zephyr-bsp`, then:
 
@@ -107,18 +114,42 @@ west init -l rak3162-zephyr-bsp
 west update
 ```
 
-### Attach to an existing Zephyr workspace
+## Mode 2 — Existing Zephyr environment (external module)
 
-Pin Zephyr to **v4.3.0**, then:
+If you already have a Zephyr **v4.3.0** workspace, use this BSP as an **external module**.
+**No need to copy** boards/samples into the Zephyr tree.
+
+1. Clone the BSP anywhere:
 
 ```bash
-export ZEPHYR_EXTRA_MODULES="/path/to/rak3162-zephyr-bsp"
-west build -b rak3162/nrf54l15/cpuapp /path/to/rak3162-zephyr-bsp/samples/hw_test
+git clone https://github.com/flwb-li/rak3162-zephyr-bsp.git /path/to/rak3162-zephyr-bsp
 ```
 
-## Mode 2 — Install into a local Zephyr tree
+2. Point Zephyr at it (one of the following):
 
-For customers who already have Zephyr v4.3.0 and do not want to change the west manifest:
+```bash
+# Option A: environment variable (simplest)
+export ZEPHYR_EXTRA_MODULES="/path/to/rak3162-zephyr-bsp"
+
+# Option B: CMake argument for a single build
+west build -b rak3162/nrf54l15/cpuapp /path/to/rak3162-zephyr-bsp/samples/hw_test \
+  -- -DZEPHYR_EXTRA_MODULES=/path/to/rak3162-zephyr-bsp
+```
+
+`zephyr/module.yml` registers `board_root`, so board `rak3162/nrf54l15/cpuapp` becomes available.
+
+3. Build and flash (sample stays in the BSP tree):
+
+```bash
+west build -b rak3162/nrf54l15/cpuapp /path/to/rak3162-zephyr-bsp/samples/hw_test --no-sysbuild
+west flash
+```
+
+You can also add the BSP as a west project in your own `west.yml` (`path` + `url`/`remote`) so it is fetched next to your other modules; still no in-tree copy is required.
+
+### Optional: copy into the Zephyr tree
+
+Only if you prefer boards/samples **inside** `$ZEPHYR_BASE` (e.g. offline packaging):
 
 ```bash
 ./scripts/install_into_zephyr.sh /path/to/zephyr
@@ -127,7 +158,7 @@ For customers who already have Zephyr v4.3.0 and do not want to change the west 
 west build -b rak3162/nrf54l15/cpuapp samples/rak/hw_test
 ```
 
-Uninstall:
+Uninstall copied files:
 
 ```bash
 ./scripts/uninstall_from_zephyr.sh /path/to/zephyr
