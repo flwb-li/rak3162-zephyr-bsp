@@ -6,7 +6,7 @@ vendor: rak
 arch: arm
 toolchain:
   - zephyr
-sysbuild: true
+sysbuild: false
 ram: 188
 flash: 1428
 supported:

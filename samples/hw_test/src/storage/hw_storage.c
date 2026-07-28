@@ -74,7 +74,7 @@ static int hw_settings_set(const char *name, size_t len_rd, settings_read_cb rea
         if (n < 0) {
             return (int)n;
         }
-        /* read_cb 成功时返回读到的字节数，不是 0；必须与结构体大小一致 */
+        /* On success read_cb returns bytes read (not 0); must match struct size. */
         if ((size_t)n != sizeof(storage_state.active_cfg)) {
             memset(&storage_state.active_cfg, 0, sizeof(storage_state.active_cfg));
         }

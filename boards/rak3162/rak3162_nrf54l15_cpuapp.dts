@@ -68,13 +68,13 @@
 	status = "okay";
 };
 
-/* UART0 - console */
-&uart21 {
+/* UART0 / uart20 - console (zephyr,console / AT) */
+&uart20 {
 	status = "okay";
 };
 
-/* UART1 - secondary */
-&uart20 {
+/* UART1 / uart21 - secondary */
+&uart21 {
 	status = "okay";
 };
 
