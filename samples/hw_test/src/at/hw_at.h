@@ -1,6 +1,7 @@
 #ifndef HW_AT_H_
 #define HW_AT_H_
 
+#include <stdbool.h>
 #include <stddef.h>
 
 /**
@@ -79,7 +80,18 @@ int hw_at_cmd_nwkkey(const struct hw_at_request *req);
 int hw_at_cmd_join(const struct hw_at_request *req);
 int hw_at_cmd_send(const struct hw_at_request *req);
 int hw_at_cmd_class(const struct hw_at_request *req);
+int hw_at_cmd_nwm(const struct hw_at_request *req);
+int hw_at_cmd_band(const struct hw_at_request *req);
+int hw_at_cmd_cfm(const struct hw_at_request *req);
+int hw_at_cmd_cfs(const struct hw_at_request *req);
+int hw_at_cmd_njs(const struct hw_at_request *req);
+int hw_at_cmd_njm(const struct hw_at_request *req);
+int hw_at_cmd_adr(const struct hw_at_request *req);
+int hw_at_cmd_recv(const struct hw_at_request *req);
 int hw_at_cmd_test(const struct hw_at_request *req);
+
+/** True when AT+NWM is P2P_LORA (0). */
+bool hw_at_nwm_is_p2p(void);
 
 int hw_at_cmd_blecw(const struct hw_at_request *req);
 int hw_at_cmd_blecwstop(const struct hw_at_request *req);

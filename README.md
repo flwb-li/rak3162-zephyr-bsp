@@ -1,13 +1,16 @@
 # RAK3162 Zephyr BSP
 
-Customer preview BSP for **RAK3162** (nRF54L15) with **onboard SX1262** LoRa radio.
+Board support package for **RAK3162** (nRF54L15) with **onboard SX1262** LoRa radio.
 Based on **Zephyr v4.3.0** and West.
 
 **Repository:** https://github.com/flwb-li/rak3162-zephyr-bsp
 
+This tree is for **practical use / evaluation**: build, flash, OTAA Class A uplink/downlink, and LoRa P2P.
+It is **not** a drop-in RUI3 firmware replacement. AT commands are a **small practical subset** inspired by RUI3 — see `samples/hw_test/doc/AT_COMMANDS.md`.
+
 SX1262 is part of the board device tree — **no `--shield` is required**.
 LoRaWAN uses Zephyr **`CONFIG_LORAWAN`** (loramac-node). LoRa P2P uses Zephyr **`CONFIG_LORA`** (`AT+P2P` / `PRECV` / `PSEND` / `CW`). There is **no Semtech USP** dependency.
-P2P and LoRaWAN share the same radio: stop P2P (`AT+PRECV=0`) before `AT+JOIN`; after join, P2P returns `AT_BUSY_ERROR`.
+Select mode with **`AT+NWM`** (`0`=P2P, `1`=LoRaWAN). Region via **`AT+BAND`** before the first join.
 
 ## Contents
 
@@ -132,8 +135,7 @@ Uninstall:
 
 ## LoRaWAN region
 
-Default region is **EU868** (`CONFIG_LORAMAC_REGION_EU868=y` in `samples/hw_test/prj.conf`).
-To change region, edit `prj.conf` and enable another `CONFIG_LORAMAC_REGION_*` (e.g. `US915`, `AS923`).
+Default **`AT+BAND=4` (EU868)**. Multiple `CONFIG_LORAMAC_REGION_*` are enabled in `samples/hw_test/prj.conf` so `AT+BAND` can switch region **before** the first `AT+JOIN`. AS923-2/3/4 and LA915 are not available in Zephyr.
 
 ## Onboard SX1262
 
@@ -148,4 +150,4 @@ AT command reference: `samples/hw_test/doc/AT_COMMANDS.md`.
 
 ## Version
 
-See [CHANGELOG.md](CHANGELOG.md). This preview BSP is **not** yet upstreamed into Zephyr.
+See [CHANGELOG.md](CHANGELOG.md). This BSP is **not** yet upstreamed into Zephyr.

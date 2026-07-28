@@ -196,17 +196,22 @@ int hw_at_cmd_appeui(const struct hw_at_request *req)
 	return -EINVAL;
 }
 
+static int require_p2p_mode(void)
+{
+	if (!hw_at_nwm_is_p2p()) {
+		hw_at_resp_error(NULL);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 int hw_at_cmd_p2p(const struct hw_at_request *req)
 {
 	char buf[128];
 
 	if (req->form == HW_AT_FORM_HELP) {
-		hw_at_resp_line("Description: View/set P2P parameters in RAM only");
-		hw_at_resp_line("AT+P2P / AT+P2P=?  View current value");
-		hw_at_resp_line("AT+P2P=<freq>:<sf>:<bw>:<cr>:<preamble>:<tx_power>");
-		hw_at_resp_line("BW: 0/125 1/250 2/500 (Zephyr LoRa)");
-		hw_at_resp_line("CR: 0=4/5 1=4/6 2=4/7 3=4/8");
-		hw_at_resp_line("Default: 868000000:7:125:0:8:14");
+		hw_at_resp_line("AT+P2P: get or set all P2P parameters");
 		hw_at_resp_ok();
 		return 0;
 	}
@@ -223,6 +228,10 @@ int hw_at_cmd_p2p(const struct hw_at_request *req)
 
 	if (req->form == HW_AT_FORM_SET) {
 		int s;
+
+		if (require_p2p_mode() != 0) {
+			return -EINVAL;
+		}
 
 		if ((req->args == NULL) || (req->args[0] == '\0')) {
 			param_error();
@@ -269,6 +278,10 @@ int hw_at_cmd_precv(const struct hw_at_request *req)
 
 	if (req->form != HW_AT_FORM_SET) {
 		param_error();
+		return -EINVAL;
+	}
+
+	if (require_p2p_mode() != 0) {
 		return -EINVAL;
 	}
 
@@ -324,6 +337,10 @@ int hw_at_cmd_psend(const struct hw_at_request *req)
 
 	if (req->form != HW_AT_FORM_SET) {
 		param_error();
+		return -EINVAL;
+	}
+
+	if (require_p2p_mode() != 0) {
 		return -EINVAL;
 	}
 
@@ -398,6 +415,10 @@ int hw_at_cmd_cw(const struct hw_at_request *req)
 
 	if (req->form != HW_AT_FORM_SET) {
 		param_error();
+		return -EINVAL;
+	}
+
+	if (require_p2p_mode() != 0) {
 		return -EINVAL;
 	}
 

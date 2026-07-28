@@ -1,6 +1,7 @@
 #include <zephyr/version.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/drivers/hwinfo.h>
 
 #include "at/hw_at.h"
 #include "core/hw_app.h"
@@ -8,9 +9,21 @@
 #include "core/hw_led.h"
 #include "core/hw_xo_cap.h"
 #include "lora/hw_lora_p2p.h"
+#include "lora/hw_lorawan.h"
 #include "storage/hw_storage.h"
 
 LOG_MODULE_REGISTER(hw_main, LOG_LEVEL_INF);
+
+static void log_reset_cause(void)
+{
+	uint32_t cause = 0U;
+	int ret = hwinfo_get_reset_cause(&cause);
+
+	if (ret == 0) {
+		LOG_INF("Reset cause: 0x%08x", cause);
+		(void)hwinfo_clear_reset_cause();
+	}
+}
 
 int main(void)
 {
@@ -23,6 +36,7 @@ int main(void)
 		return ret;
 	}
 	LOG_INF("Console init done");
+	log_reset_cause();
 
 	ret = hw_storage_init();
 	if (ret != 0) {
@@ -34,8 +48,12 @@ int main(void)
 	}
 
 	hw_lora_p2p_init();
+	hw_lorawan_init();
 	hw_at_init();
-	LOG_INF("AT framework init done (P2P + LoRaWAN OTAA)");
+	LOG_INF("AT framework init done (RUI3-like P2P + LoRaWAN)");
+
+	/* RUI3 AT+JOIN Param2: auto-join on power up */
+	hw_lorawan_autojoin_on_boot();
 
 	ret = hw_led_start();
 	if (ret != 0) {
