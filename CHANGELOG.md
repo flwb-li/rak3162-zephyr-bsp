@@ -22,4 +22,4 @@ RAK3162 Zephyr BSP. Format based on [Keep a Changelog](https://keepachangelog.co
 - Removed Semtech USP / `usp_zephyr` from `west.yml` and sample build
 - P2P no longer depends on USP; mutually exclusive with an active LoRaWAN stack session
 - Board TCXO startup delay set to 30 ms
-- Docs: practical AT subset for use — not full RUI3 parity
+- Docs: Mode 2 is external module via `ZEPHYR_EXTRA_MODULES` (copy-into-tree is optional)
