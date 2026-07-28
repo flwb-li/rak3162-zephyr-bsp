@@ -12,7 +12,7 @@
 		smtc-watchdog = &wdt31;
 	};
 
-	/* GRTC LF monitor: MCU P2.06 (silk GPIO4), see AT+GRTCTEST */
+	/* GRTC LF monitor: MCU P2.06 (silk GPIO4), see AT+TEST=GRTC */
 	lf_monitor {
 		compatible = "gpio-leds";
 		lf_mon_out: lf_mon_out {

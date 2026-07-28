@@ -31,7 +31,7 @@ On a **clean** machine (no Zephyr / west / SDK preinstalled):
 - An **SWD debug probe** to flash the module (J-Link, CMSIS-DAP / DAPLink, or another pyOCD-compatible probe)
 
 `./scripts/bootstrap.sh` installs west, Python deps, and Zephyr SDK into the workspace.
-Flash tools (pyOCD / J-Link / nRF Util) are **not** installed by bootstrap — see [Flash](#flash).
+Flash tools (J-Link / pyOCD / nRF Util) are **not** installed by bootstrap — see [Flash](#flash).
 
 There are **two** ways to use this BSP:
 
@@ -77,11 +77,13 @@ west flash
 
 ### Manual west init
 
+Use a **full** `west update` (do **not** pass `--depth=1`). `hal_nordic` is SHA-pinned; shallow fetches often fail to resolve that commit.
+
 ```bash
 mkdir rak3162-workspace && cd rak3162-workspace
 west init -m https://github.com/flwb-li/rak3162-zephyr-bsp.git --mr main rak3162-zephyr-bsp
 cd rak3162-zephyr-bsp
-west update -o=--depth=1 -n
+west update
 west zephyr-export
 
 west build -b rak3162/nrf54l15/cpuapp samples/hw_test --no-sysbuild --pristine always
@@ -150,19 +152,64 @@ You can also add the BSP as a west project in your own `west.yml` (`path` + `url
 ## Flash
 
 RAK3162 is programmed over **SWD** (nRF54L15). Connect a debug probe to the board’s SWD pads/header:
+
+| Probe signal | Board |
+|--------------|--------|
+| SWDIO | SWDIO |
+| SWCLK | SWCLK |
+| GND | GND |
+| RESET (recommended) | nRESET / RESET |
+| VTref (if required by probe) | 3.3 V |
+
 Power the board (USB or external 3.3 V as applicable) before flashing. Keep SWD wires short.
+
+### Windows + WSL / Linux VM (usbipd)
+
+If you build and flash from **WSL2** (or another Linux environment on Windows), the debug probe and USB–UART adapter are attached to Windows first. Pass them into Linux with **[usbipd-win](https://github.com/dorssel/usbipd-win)** before `west flash` or opening a serial port.
+
+1. On Windows, install usbipd-win (e.g. `winget install dorssel.usbipd-win`).
+2. Plug in the probe (and/or USB–UART). Keep a WSL terminal open so the distro stays running.
+3. In **PowerShell** (Administrator for `bind`):
+
+```powershell
+usbipd list
+usbipd bind --busid <BUSID>
+usbipd attach --wsl --busid <BUSID>
+```
+
+Replace `<BUSID>` with the probe’s bus id from `usbipd list` (for example `1-3`).
+
+4. In WSL, confirm the device is visible, then flash:
+
+```bash
+lsusb
+west flash
+```
+
+Detach when finished (PowerShell):
+
+```powershell
+usbipd detach --busid <BUSID>
+```
+
+Notes:
+
+- Attach is not permanent: re-run `usbipd attach` after reboot, unplug/replug, or if the probe resets.
+- While attached to WSL, Windows applications cannot use that USB device.
+- The same steps apply to the USB–UART adapter used for the AT console.
+- See also [Connect USB devices (Microsoft Learn)](https://learn.microsoft.com/en-us/windows/wsl/connect-usb).
 
 ### Tooling
 
-Default flash runner in `boards/rak3162/board.cmake` is **pyOCD** (`--target=nrf54l`). J-Link and nRF Util are also supported.
+Default flash runner in `boards/rak3162/board.cmake` is **J-Link** (`nRF54L15_M33`). pyOCD and nRF Util are also supported.
 
 | Runner | Install | Typical use |
 |--------|---------|-------------|
-| **pyOCD** (default) | `pip install pyocd` (use the workspace `.venv` after Mode 1 bootstrap) | CMSIS-DAP / DAPLink / many low-cost probes |
-| **J-Link** | [SEGGER J-Link software](https://www.segger.com/downloads/jlink/) | SEGGER J-Link / J-Link OB |
+| **J-Link** (default) | [SEGGER J-Link software](https://www.segger.com/downloads/jlink/) | SEGGER J-Link / J-Link OB |
+| **pyOCD** | `pip install pyocd` (use the workspace `.venv` after Mode 1 bootstrap) | CMSIS-DAP / DAPLink / many low-cost probes |
 | **nrfutil** | [nRF Util](https://www.nordicsemi.com/Products/Development-tools/nRF-Util) | Nordic tooling / some DK setups |
 
-On Linux, install udev rules so the probe is usable without root. A starter rule is in `boards/rak3162/support/99-rak3162.rules` (J-Link vendor `1366`). Adjust `idVendor`/`idProduct` for your probe (`lsusb`), then:
+On Linux (including WSL after usbipd attach), install udev rules so the probe is usable without root. A starter rule is in `boards/rak3162/support/99-rak3162.rules` (J-Link vendor `1366`). Adjust `idVendor`/`idProduct` for your probe (`lsusb`), then:
 
 ```bash
 sudo cp boards/rak3162/support/99-rak3162.rules /etc/udev/rules.d/
@@ -181,11 +228,10 @@ west flash
 west flash -d build
 ```
 
-Select a non-default runner when needed:
+Override the runner when needed:
 
 ```bash
 west flash --runner pyocd
-west flash --runner jlink
 west flash --runner nrfutil
 ```
 
@@ -206,8 +252,10 @@ AT
 AT+VER=?
 ```
 
+On WSL, attach the USB–UART with `usbipd` as above, then use a Linux serial tool (for example `minicom`, `picocom`, or `screen /dev/ttyACM0 115200`).
+
 Full AT list: `samples/hw_test/doc/AT_COMMANDS.md`.  
-Pin tables: `doc/hardware_pins.md` and `boards/rak3162/doc/hardware_pins.md`.
+Pin tables: `boards/rak3162/doc/hardware_pins.md`.
 
 ## LoRaWAN region
 
@@ -222,4 +270,7 @@ Radio is defined in `boards/rak3162/rak3162_nrf54l15_cpuapp.dts` (SPI `spi22` / 
 **1.0.0** — see [CHANGELOG.md](CHANGELOG.md). This BSP is **not** yet upstreamed into Zephyr.
 
 ## License
+
+Licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
 Copyright (c) 2026 RAKwireless Technology Limited.

@@ -13,7 +13,7 @@
  * @brief AT command form decoded from input line.
  *
  * The parser supports a RUI3-like syntax:
- * - EXEC: `AT+XXX` (or `ATZ`, `ATR`, `ATE0/1` shorthand)
+ * - EXEC: `AT+XXX` (or `ATZ`, `ATE0/1` shorthand)
  * - HELP: `AT+XXX?`
  * - GET:  `AT+XXX=?`
  * - SET:  `AT+XXX=<args>`

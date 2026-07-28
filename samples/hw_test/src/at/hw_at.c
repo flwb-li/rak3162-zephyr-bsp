@@ -43,7 +43,6 @@ struct hw_at_command {
 
 struct hw_at_runtime {
     bool echo;
-    bool locked;
     struct hw_runtime_cfg cfg;
 };
 
@@ -599,18 +598,8 @@ void hw_at_process_line(char *line)
         name[1] = '\0';
     }
 
-    /* ATR / ATZ / ATE without plus sign. */
-    if ((name[0] == 'R') && (name[1] == '\0')) {
-        name[0] = 'R';
-    }
-
     str_to_upper(name);
     req.name = name;
-
-    if (at_rt.locked && (strcmp(name, "PWORD") != 0) && (strcmp(name, "ATM") != 0)) {
-        resp_status("COMMAND_LOCKED");
-        return;
-    }
 
     cmd = find_command(name);
     if (cmd == NULL) {
