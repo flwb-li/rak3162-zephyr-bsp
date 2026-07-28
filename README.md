@@ -181,4 +181,4 @@ AT command reference: `samples/hw_test/doc/AT_COMMANDS.md`.
 
 ## Version
 
-See [CHANGELOG.md](CHANGELOG.md). This BSP is **not** yet upstreamed into Zephyr.
+**1.0.0** — see [CHANGELOG.md](CHANGELOG.md). This BSP is **not** yet upstreamed into Zephyr.
