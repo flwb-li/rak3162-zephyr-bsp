@@ -26,7 +26,6 @@ development (OTAA Class A + LoRa P2P). Not a full RUI3 firmware replacement.
 - **Mode 1**: dedicated west workspace via `west.yml` + `scripts/bootstrap.sh`
   (venv, Zephyr, SDK, `env.sh`)
 - **Mode 2**: use as external Zephyr module via `ZEPHYR_EXTRA_MODULES`
-  (optional in-tree copy: `scripts/install_into_zephyr.sh`)
 - Minimal module set in `west.yml`: `cmsis`, `cmsis_6`, `hal_nordic`, `loramac-node`
 - Hardware pin notes under `doc/` and `boards/rak3162/doc/`
 

@@ -21,8 +21,6 @@ Select mode with **`AT+NWM`** (`0`=P2P, `1`=LoRaWAN). Region via **`AT+BAND`** b
 | `zephyr/module.yml` | Registers this tree as a Zephyr module (`board_root`) |
 | `west.yml` | West manifest (Zephyr v4.3.0 + minimal modules) — Mode 1 |
 | `scripts/bootstrap.sh` | Mode 1: fetch Zephyr/modules (+ optional SDK) for this BSP |
-| `scripts/install_into_zephyr.sh` | Optional: copy boards/samples into a Zephyr tree |
-| `scripts/uninstall_from_zephyr.sh` | Optional: remove files installed by the copy script |
 
 ## Requirements
 
@@ -148,23 +146,6 @@ west flash
 ```
 
 You can also add the BSP as a west project in your own `west.yml` (`path` + `url`/`remote`) so it is fetched next to your other modules; still no in-tree copy is required.
-
-### Optional: copy into the Zephyr tree
-
-Only if you prefer boards/samples **inside** `$ZEPHYR_BASE` (e.g. offline packaging):
-
-```bash
-./scripts/install_into_zephyr.sh /path/to/zephyr
-# optional: --dry-run  --force
-
-west build -b rak3162/nrf54l15/cpuapp samples/rak/hw_test
-```
-
-Uninstall copied files:
-
-```bash
-./scripts/uninstall_from_zephyr.sh /path/to/zephyr
-```
 
 ## Flash
 
