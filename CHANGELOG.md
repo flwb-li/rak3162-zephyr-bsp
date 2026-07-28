@@ -1,25 +1,34 @@
 # Changelog
 
-RAK3162 Zephyr BSP. Format based on [Keep a Changelog](https://keepachangelog.com/).
+All notable changes to the RAK3162 Zephyr BSP are documented in this file.
+
+Format based on [Keep a Changelog](https://keepachangelog.com/).
+Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-28
+
+First public release of the RAK3162 Zephyr BSP.
+
+Based on **Zephyr v4.3.0**. Intended for practical evaluation and application
+development (OTAA Class A + LoRa P2P). Not a full RUI3 firmware replacement.
+
 ### Added
 
-- Board/sample tree at this repository root
-- Onboard SX1262 in `boards/rak3162` device tree (no shield)
-- Mode 1: West manifest (`west.yml`) + Zephyr module (`zephyr/module.yml`)
-- Mode 2: `scripts/install_into_zephyr.sh` / `uninstall_from_zephyr.sh`
-- Mode 1 bootstrap: `scripts/bootstrap.sh` (clean-PC: venv + west update + SDK + `env.sh`)
-- `west.yml` imports only `cmsis` / `cmsis_6` / `hal_nordic` / `loramac-node` (enough for `samples/hw_test`)
-- `samples/hw_test` AT sample: LoRaWAN OTAA Class A + LoRa P2P (`AT+NWM` / `AT+BAND` / `AT+JOIN` / `AT+SEND` / `+EVT:RX_1:...`)
-- LoRa P2P AT commands over Zephyr `CONFIG_LORA` (`AT+P2P` / `AT+PRECV` / `AT+PSEND` / `AT+CW`)
-- RUI3-inspired JOIN parameters (stop / auto-join / retry interval / attempts)
+- Board support for **RAK3162** (`rak3162/nrf54l15/cpuapp`) with onboard SX1262
+  (`semtech,sx1262`, alias `lora0`; no shield required)
+- Sample firmware `samples/hw_test`: AT console over UART
+- LoRaWAN (Zephyr `CONFIG_LORAWAN` / loramac-node): OTAA Class A, `AT+NWM` /
+  `AT+BAND` / `AT+JOIN` / `AT+SEND` / `AT+RECV`, downlink `+EVT:RX_1:...`
+- LoRa P2P (Zephyr `CONFIG_LORA`): `AT+P2P` / `AT+PRECV` / `AT+PSEND` / `AT+CW`
+- Practical AT command subset (RUI3-inspired); see `samples/hw_test/doc/AT_COMMANDS.md`
+- **Mode 1**: dedicated west workspace via `west.yml` + `scripts/bootstrap.sh`
+  (venv, Zephyr, SDK, `env.sh`)
+- **Mode 2**: use as external Zephyr module via `ZEPHYR_EXTRA_MODULES`
+  (optional in-tree copy: `scripts/install_into_zephyr.sh`)
+- Minimal module set in `west.yml`: `cmsis`, `cmsis_6`, `hal_nordic`, `loramac-node`
+- Hardware pin notes under `doc/` and `boards/rak3162/doc/`
 
-### Changed
-
-- SX1262 uses Zephyr `semtech,sx1262` + `lora0` alias (loramac-node / `CONFIG_LORAWAN`)
-- Removed Semtech USP / `usp_zephyr` from `west.yml` and sample build
-- P2P no longer depends on USP; mutually exclusive with an active LoRaWAN stack session
-- Board TCXO startup delay set to 30 ms
-- Docs: Mode 2 is external module via `ZEPHYR_EXTRA_MODULES` (copy-into-tree is optional)
+[Unreleased]: https://github.com/flwb-li/rak3162-zephyr-bsp/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/flwb-li/rak3162-zephyr-bsp/releases/tag/v1.0.0
