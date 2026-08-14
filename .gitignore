@@ -1,8 +1,15 @@
-# Ignore west / build artifacts when this tree is used as a west workspace root fragment
+# West / build artifacts (this tree is the west manifest project, not the workspace root)
 .west/
-modules/
 build/
 *.hex
 *.elf
 *.map
 .DS_Store
+
+# Ignore west-fetched trees if they ever land under this repo; keep vendored rak-fw
+modules/*
+!modules/rak-fw/
+!modules/rak-fw/**
+
+twister-out/
+twister-out*/

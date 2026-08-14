@@ -1,0 +1,23 @@
+# Copyright (c) 2026 RAKwireless Technology Limited
+# SPDX-License-Identifier: Apache-2.0
+#
+# Run from the west workspace root (parent of rak3162-zephyr-bsp/):
+#   docker compose -f rak3162-zephyr-bsp/docker/compose.yaml build
+#   docker compose -f rak3162-zephyr-bsp/docker/compose.yaml run --rm build \
+#     west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build
+#
+# Compose paths are relative to this file's directory (docker/).
+# Build context = BSP root; bind mount = west workspace (../..).
+
+services:
+  build:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: rak3162-zephyr:4.3.0-sdk0.17.4
+    working_dir: /workdir
+    volumes:
+      - ../..:/workdir
+    environment:
+      ZEPHYR_SDK_INSTALL_DIR: /opt/zephyr-sdk-0.17.4
+      ZEPHYR_TOOLCHAIN_VARIANT: zephyr

@@ -1,0 +1,12 @@
+# Copyright (c) 2026 RAKwireless Technology Limited
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  rak_fw.util.hex:
+    platform_allow:
+      - qemu_cortex_m3
+    tags:
+      - rak_fw
+      - util
+    integration_platforms:
+      - qemu_cortex_m3

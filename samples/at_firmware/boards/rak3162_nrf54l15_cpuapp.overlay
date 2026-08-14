@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) 2026 RAKwireless Technology Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * RAK3162 product firmware overlay
+ */
+
+/ {
+	aliases {
+		smtc-watchdog = &wdt31;
+	};
+};
+
+&ieee802154 {
+	status = "disabled";
+};
+
+&wdt31 {
+	status = "okay";
+};
+
+/*
+ * Secondary buses stay enabled in DT so drivers load, but the app suspends
+ * them via pm_device between LoRaWAN windows (see bus_pm.c).
+ */
+&uart21 {
+	status = "okay";
+};
+
+&i2c30 {
+	status = "okay";
+};
+
+&spi00 {
+	status = "okay";
+};
+
+/*
+ * RF switch supply is enabled only around LoRaWAN Join/TX/RX windows
+ * (see radio_bind board_rf_window_*), not left on from boot.
+ */
+&lora_ant_sw {
+	/delete-property/ regulator-boot-on;
+};
+
+/*
+ * P1.07 AT RX wake: use GPIO SENSE/DETECT (PORT) instead of a GPIOTE IN
+ * channel. Edge+GPIOTE previously cost ~25 µA in System ON idle.
+ */
+&gpio1 {
+	sense-edge-mask = <0x80>; /* BIT(7) = P1.07 */
+};

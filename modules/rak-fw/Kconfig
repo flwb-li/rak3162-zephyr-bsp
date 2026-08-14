@@ -1,0 +1,64 @@
+# Copyright (c) 2026 RAKwireless Technology Limited
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig RAK_FW
+	bool "RAK firmware framework (AT + LoRa)"
+	help
+	  External module: RUI3-compatible AT console and LoRaWAN/P2P helpers.
+
+if RAK_FW
+
+config RAK_FW_LORAWAN
+	bool "LoRaWAN service library"
+	depends on LORAWAN
+	default y
+
+config RAK_FW_LORA_P2P
+	bool "LoRa P2P service library"
+	depends on LORA
+	default y
+
+config RAK_AT
+	bool "AT command framework (RUI3-compatible)"
+	depends on SERIAL
+	depends on UART_ASYNC_API
+	default y
+	help
+	  Parser, UART runtime and optional LoRaWAN/P2P AT command façades.
+
+if RAK_AT
+
+config RAK_AT_LORAWAN
+	bool "RUI3 LoRaWAN AT commands"
+	depends on LORAWAN
+	depends on RAK_FW_LORAWAN
+	default y
+
+config RAK_AT_LORA_P2P
+	bool "RUI3 LoRa P2P AT commands"
+	depends on LORA
+	depends on RAK_FW_LORA_P2P
+	default y
+
+config RAK_AT_UART_LP
+	bool "UART low-power enter/exit helpers"
+	default y
+
+config RAK_AT_UART_LP_KEEP_RX
+	bool "Keep UART async RX during LP (no first-byte loss)"
+	depends on RAK_AT_UART_LP
+	default n
+	help
+	  When enabled, AT UART LP does not suspend the console or arm GPIO
+	  Sense. UARTE async RX stays active so the first host byte is not
+	  lost, but idle current is much higher (measured ~155 µA).
+	  Default is n: GPIO Sense wake (~5 µA class); first wake byte may
+	  be lost and +EVT:UART_WAKE is emitted.
+
+config RAK_AT_SETTINGS_ROOT
+	string "Settings subtree used by product config adapters"
+	default "rak3162"
+
+endif # RAK_AT
+
+endif # RAK_FW

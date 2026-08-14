@@ -4,6 +4,9 @@
 
 # Bootstrap a self-contained RAK3162 Zephyr workspace for customers.
 #
+# DEPRECATED: prefer in-tree Docker (docker/compose.yaml from workspace root).
+# This script remains for offline/legacy hosts only.
+#
 # Designed for a machine with *no* prior Zephyr / west / SDK setup.
 # Clears inherited Zephyr environment variables, creates a workspace-local
 # Python venv, fetches Zephyr v4.3.0 + minimal modules, and installs the
@@ -17,7 +20,7 @@
 #   git clone <bsp-url> rak3162-zephyr-bsp
 #   ./rak3162-zephyr-bsp/scripts/bootstrap.sh
 #   source ./env.sh
-#   west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/hw_test --no-sysbuild
+#   west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware --no-sysbuild
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,7 +54,7 @@ Options:
   --workspace DIR   West workspace root (default: parent of this BSP clone)
   --sdk-dir DIR     Use/install SDK at DIR (default: <workspace>/zephyr-sdk-${ZEPHYR_SDK_VERSION})
   --no-sdk          Skip Zephyr SDK download/install
-  --build           Build samples/hw_test after bootstrap
+  --build           Build samples/at_firmware after bootstrap
   --retries N       Max attempts for network steps (default: ${RETRY_MAX})
   -h, --help        Show this help
 
@@ -406,8 +409,8 @@ maybe_build() {
 	# shellcheck disable=SC1091
 	source "${WORKSPACE}/env.sh"
 
-	log "Building samples/hw_test"
-	west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/hw_test \
+	log "Building samples/at_firmware"
+	west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware \
 		--no-sysbuild --pristine always
 }
 
@@ -424,7 +427,7 @@ SDK:       ${ZEPHYR_SDK_INSTALL_DIR:-"(not installed; pass --sdk-dir or re-run w
 Build (always source env.sh in a new shell):
   cd ${WORKSPACE}
   source ./env.sh
-  west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/hw_test --no-sysbuild --pristine always
+  west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware --no-sysbuild --pristine always
   west flash
 
 AT console: 115200 8N1

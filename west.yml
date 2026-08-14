@@ -12,7 +12,7 @@ manifest:
       remote: zephyrproject
       repo-path: zephyr
       revision: v4.3.0
-      # Only modules required to build RAK3162 samples/hw_test
+      # Only modules required to build RAK3162 samples/at_firmware
       # (nRF54L15 + LoRaWAN loramac-node + onboard SX1262).
       import:
         name-allowlist:
@@ -23,3 +23,6 @@ manifest:
 
   self:
     path: rak3162-zephyr-bsp
+    # Firmware framework is vendored at modules/rak-fw and is pinned to this
+    # BSP git revision. samples/at_firmware/CMakeLists.txt injects it via
+    # ZEPHYR_EXTRA_MODULES (no separate west remote required until published).
