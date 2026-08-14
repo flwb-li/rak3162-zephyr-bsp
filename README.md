@@ -13,7 +13,6 @@ Product / field AT firmware: OTAA Class A, auto-join, configurable counter uplin
 |-----|------|
 | AT commands | `samples/at_firmware/doc/AT_COMMANDS.md` |
 | Low power | `samples/at_firmware/doc/LOW_POWER.md` |
-| Firmware overview (ZH) | `samples/at_firmware/doc/固件说明.md` |
 | Docker | `docker/README.md` |
 
 Mode: **`AT+NWM`** (`0`=P2P, `1`=LoRaWAN). Region: **`AT+BAND`** (default EU868).

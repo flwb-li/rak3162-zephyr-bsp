@@ -25,8 +25,8 @@ development (OTAA Class A + LoRa P2P). Not a full RUI3 firmware replacement.
   `AT+BAND` / `AT+JOIN` / `AT+SEND` / `AT+RECV`, downlink `+EVT:RX_1:...`
 - LoRa P2P (Zephyr `CONFIG_LORA`): `AT+P2P` / `AT+PRECV` / `AT+PSEND` / `AT+CW`
 - Practical AT command subset (RUI3-inspired); see `samples/at_firmware/doc/AT_COMMANDS.md`
-- Docs: Docker-first README (incl. Windows / WSL2 notes), `LOW_POWER.md`,
-  `固件说明.md`, `测试文档.md`
+- Docs: Docker-first README (incl. Windows / WSL2 notes), `AT_COMMANDS.md`,
+  `LOW_POWER.md`
 - West workspace via `west.yml` (minimal modules: `cmsis`, `cmsis_6`,
   `hal_nordic`, `loramac-node`); optional deprecated `scripts/bootstrap.sh`
 - Hardware pin notes under `boards/rak3162/doc/`
