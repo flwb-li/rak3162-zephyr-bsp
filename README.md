@@ -34,6 +34,18 @@ Mode: **`AT+NWM`** (`0`=P2P, `1`=LoRaWAN). Region: **`AT+BAND`** (default EU868)
 - **Docker** (recommended) **or** a west workspace with Zephyr v4.3.0 + SDK **0.17.4**
 - **SWD** probe on the **host** (J-Link / CMSIS-DAP / pyOCD). No USB / serial DFU in this tree.
 
+### Windows note
+
+Docker works on Windows via **Docker Desktop + WSL2** (the image is Linux/`linux-x86_64`).
+
+- Prefer keeping the west workspace under the **WSL filesystem** (e.g. `~/workspace`), not
+  under `/mnt/c/...` — bind mounts from NTFS are slower and more failure-prone.
+- Run `docker compose` / `west` from a **WSL** shell (or Docker Desktop integrated with that distro).
+- Keep `docker/entrypoint.sh` as **LF** line endings (`core.autocrlf` / `.gitattributes` matter).
+- Flash SWD tools on the **Windows host**; the container does not provide USB flashing.
+
+Details: [`docker/README.md`](docker/README.md).
+
 ## Mode 1 — Docker (recommended)
 
 Workspace layout after `west init -l` / `west update`:
@@ -46,7 +58,7 @@ workspace/                      # west workspace root (.west lives here)
 ```
 
 ```bash
-# from workspace root
+# from workspace root (Linux or WSL)
 docker compose -f rak3162-zephyr-bsp/docker/compose.yaml build
 docker compose -f rak3162-zephyr-bsp/docker/compose.yaml run --rm build \
   west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build
