@@ -10,6 +10,9 @@ so `zephyr/`, `modules/`, and this BSP stay siblings on the host.
 The image is **Linux** (`ubuntu:22.04` + Zephyr SDK **linux-x86_64**). On Windows use
 **Docker Desktop with the WSL2 backend**.
 
+If the PC has **no WSL2** (e.g. some Windows Home setups), skip Docker and use
+**Mode 2 — native Windows** in the BSP [`README.md`](../README.md).
+
 | Do | Avoid |
 |----|--------|
 | Put the west workspace in the **WSL** home (e.g. `~/workspace`) | Long-term builds from `/mnt/c/...` (slow / flaky mounts) |

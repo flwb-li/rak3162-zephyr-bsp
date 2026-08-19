@@ -163,6 +163,8 @@ static void tx_begin_lp(void)
 {
 	lp_disarm();
 	(void)console_resume();
+	/* Let UARTE/HFCLK and pinctrl settle before shifting bytes. */
+	k_busy_wait(200);
 }
 
 static void tx_end_lp(void)
@@ -174,6 +176,8 @@ static void tx_end_lp(void)
 		return;
 	}
 
+	/* uart_poll_out can return before the stop bit is on the wire. */
+	k_busy_wait(500);
 	(void)console_suspend();
 	(void)lp_arm();
 }

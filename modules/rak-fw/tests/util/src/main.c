@@ -38,4 +38,22 @@ ZTEST(rak_at_util, test_parse_appkey_len)
 	zassert_equal(rak_at_parse_hex_bytes("001122", 6, key, sizeof(key)), -EINVAL);
 }
 
+ZTEST(rak_at_util, test_parse_ulong)
+{
+	unsigned long v = 99UL;
+
+	zassert_ok(rak_at_parse_ulong("0", &v));
+	zassert_equal(v, 0UL);
+	zassert_ok(rak_at_parse_ulong("123", &v));
+	zassert_equal(v, 123UL);
+
+	zassert_equal(rak_at_parse_ulong("", &v), -EINVAL);
+	zassert_equal(rak_at_parse_ulong("abc", &v), -EINVAL);
+	zassert_equal(rak_at_parse_ulong("1x", &v), -EINVAL);
+	zassert_equal(rak_at_parse_ulong("-1", &v), -EINVAL);
+	zassert_equal(rak_at_parse_ulong("+1", &v), -EINVAL);
+	zassert_equal(rak_at_parse_ulong(" 1", &v), -EINVAL);
+	zassert_equal(rak_at_parse_ulong(NULL, &v), -EINVAL);
+}
+
 ZTEST_SUITE(rak_at_util, NULL, NULL, NULL, NULL, NULL);

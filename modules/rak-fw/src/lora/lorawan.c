@@ -20,6 +20,7 @@
 #include <LoRaMac.h>
 #include <LoRaMacCrypto.h>
 #include <sx126x/sx126x.h>
+#include <sx126x-board.h>
 
 LOG_MODULE_REGISTER(rak_fw_lw, LOG_LEVEL_INF);
 
@@ -101,13 +102,14 @@ static void rf_front_enable(void)
 		bops->rf_window_enter();
 	}
 
-	if (radio_cold_sleeping) {
+	if (lw_started) {
 		/*
-		 * WarmStart=1 keeps SX1262 registers. The next SPI access wakes
-		 * the transceiver; no full RadioReInit is required.
+		 * SetSleep() and LoRaMacDeInitialization() disable DIO1. SPI CS
+		 * wakes the transceiver; SX126xWakeup() re-enables DIO1 so TX/RX
+		 * done IRQs can complete lorawan_join() / lorawan_send().
 		 */
+		SX126xWakeup();
 		radio_cold_sleeping = false;
-		LOG_INF("SX1262 warm wake");
 	}
 }
 
@@ -156,8 +158,8 @@ static void lw_work_handler(struct k_work *work);
 static int queue_send_locked(uint8_t port, const uint8_t *data, uint8_t len,
 			     enum lorawan_message_type type);
 
-/* LoRaMAC OTAA (soft-se crypto + multi-region) needs >4KB on this WQ thread. */
-#define LW_WQ_STACK_SIZE 8192
+/* LoRaMAC OTAA (soft-se crypto + multi-region) needs ample WQ stack. */
+#define LW_WQ_STACK_SIZE 12288
 
 static K_THREAD_STACK_DEFINE(lw_wq_stack, LW_WQ_STACK_SIZE);
 static struct k_work_q lw_wq;
@@ -358,6 +360,84 @@ static int lorawan_clear_session(void)
 	return 0;
 }
 
+int rak_fw_lorawan_apply_band(uint8_t band)
+{
+	enum lorawan_region region;
+	int ret;
+	bool dropped_session = false;
+
+	ret = rak_fw_lorawan_band_to_region(band, &region);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ensure_lock();
+	k_mutex_lock(&lw_lock, K_FOREVER);
+
+	if (lw_busy || lw_joining) {
+		k_mutex_unlock(&lw_lock);
+		return -EBUSY;
+	}
+
+	if (lw_joined || (lw_started && lorawan_session_is_active())) {
+		ret = lorawan_clear_session();
+		if (ret != 0) {
+			k_mutex_unlock(&lw_lock);
+			return ret;
+		}
+		dropped_session = true;
+	}
+
+	ret = lorawan_set_region(region);
+	if (ret != 0) {
+		k_mutex_unlock(&lw_lock);
+		return ret;
+	}
+
+	if (!lw_started) {
+		k_mutex_unlock(&lw_lock);
+		if (dropped_session) {
+			notify_join_status(false);
+		}
+		return 0;
+	}
+
+	if (LoRaMacDeInitialization() != LORAMAC_STATUS_OK) {
+		k_mutex_unlock(&lw_lock);
+		return -EBUSY;
+	}
+
+	/* Deinit leaves the radio asleep (DIO1 off); force wake on next RF window. */
+	radio_cold_sleeping = true;
+
+	ret = lorawan_start();
+	if (ret != 0) {
+		lw_started = false;
+		k_mutex_unlock(&lw_lock);
+		LOG_ERR("lorawan_start after BAND change failed: %d", ret);
+		if (dropped_session) {
+			notify_join_status(false);
+		}
+		return ret;
+	}
+
+	if (lorawan_session_is_active()) {
+		ret = lorawan_clear_session();
+		if (ret != 0) {
+			k_mutex_unlock(&lw_lock);
+			return ret;
+		}
+		dropped_session = true;
+	}
+
+	k_mutex_unlock(&lw_lock);
+	if (dropped_session) {
+		notify_join_status(false);
+	}
+	LOG_INF("LoRaWAN region applied (BAND=%u)", band);
+	return 0;
+}
+
 void rak_fw_lorawan_init(void)
 {
 	ensure_lock();
@@ -508,8 +588,10 @@ static void lw_work_handler(struct k_work *work)
 		bool stopped = false;
 		int last_err = -EIO;
 
+		rf_front_enable();
 		ret = rak_fw_lorawan_ensure_started();
 		if (ret != 0) {
+			rf_front_disable();
 			emit_join_failed(ret);
 			notify_join_status(false);
 			goto done;
@@ -542,10 +624,33 @@ static void lw_work_handler(struct k_work *work)
 				(jcopy.attempts == 0U) ? " (unlimited)" : "");
 
 			rf_front_enable();
+			{
+				const struct rak_fw_board_ops *bops = rak_fw_board_ops();
+
+				if ((bops != NULL) && (bops->indicate_tx != NULL)) {
+					bops->indicate_tx();
+				}
+			}
 			ret = lorawan_join(&join_cfg);
 			rf_front_disable();
 			last_err = ret;
 			LOG_INF("lorawan_join returned %d", ret);
+
+			/* AT+JOIN=0 during OTAA cannot preempt lorawan_join(); honor stop
+			 * after return so a late air success does not keep the session.
+			 */
+			k_mutex_lock(&lw_lock, K_FOREVER);
+			stopped = lw_join_stop;
+			k_mutex_unlock(&lw_lock);
+			if (stopped) {
+				if (ret == 0) {
+					(void)lorawan_clear_session();
+					LOG_INF("Join success discarded after AT+JOIN=0");
+				} else {
+					LOG_INF("Join stopped by AT+JOIN=0");
+				}
+				break;
+			}
 
 			if (ret == 0) {
 				k_mutex_lock(&lw_lock, K_FOREVER);
@@ -586,9 +691,11 @@ static void lw_work_handler(struct k_work *work)
 	} else if (job == LW_JOB_SEND) {
 		rf_front_enable();
 		ret = lorawan_send(scopy.port, scopy.data, scopy.len, scopy.type);
-		rf_front_disable();
 		send_result = ret;
 
+		/* Print +EVT while UART is still fully muxed (rf_front_enable
+		 * did lp_exit). Suspending UART first garbles TX_DONE.
+		 */
 		if (ret == 0) {
 			evt_line("+EVT:TX_DONE");
 			{
@@ -613,6 +720,8 @@ static void lw_work_handler(struct k_work *work)
 				evt_line("+EVT:SEND_CONFIRMED_FAILED");
 			}
 		}
+
+		rf_front_disable();
 	}
 
 done:
@@ -686,6 +795,44 @@ int rak_fw_lorawan_join_stop(void)
 	lw_join_stop = true;
 	k_mutex_unlock(&lw_lock);
 	k_sem_give(&join_stop_sem);
+	return 0;
+}
+
+int rak_fw_lorawan_stop(void)
+{
+	int ret = 0;
+
+	ensure_lock();
+	k_mutex_lock(&lw_lock, K_FOREVER);
+
+	if (lw_busy || lw_joining) {
+		k_mutex_unlock(&lw_lock);
+		return -EBUSY;
+	}
+
+	if (lw_started) {
+		if (lw_joined || lorawan_session_is_active()) {
+			ret = lorawan_clear_session();
+			if (ret != 0) {
+				k_mutex_unlock(&lw_lock);
+				return ret;
+			}
+		}
+
+		if (LoRaMacDeInitialization() != LORAMAC_STATUS_OK) {
+			k_mutex_unlock(&lw_lock);
+			return -EBUSY;
+		}
+
+		radio_cold_sleeping = true;
+		lw_started = false;
+	}
+
+	lw_joined = false;
+	k_mutex_unlock(&lw_lock);
+
+	notify_join_status(false);
+	LOG_INF("LoRaWAN stack stopped");
 	return 0;
 }
 
@@ -800,6 +947,34 @@ void rak_fw_lorawan_set_adr(bool enable)
 bool rak_fw_lorawan_get_adr(void)
 {
 	return lw_adr;
+}
+
+int rak_fw_lorawan_get_devaddr(uint32_t *devaddr)
+{
+	MibRequestConfirm_t mib = {
+		.Type = MIB_DEV_ADDR,
+	};
+
+	if (devaddr == NULL) {
+		return -EINVAL;
+	}
+
+	ensure_lock();
+	k_mutex_lock(&lw_lock, K_FOREVER);
+
+	if (!lw_started || !lw_joined) {
+		k_mutex_unlock(&lw_lock);
+		return -ENOTCONN;
+	}
+
+	if (LoRaMacMibGetRequestConfirm(&mib) != LORAMAC_STATUS_OK) {
+		k_mutex_unlock(&lw_lock);
+		return -EIO;
+	}
+
+	*devaddr = mib.Param.DevAddr;
+	k_mutex_unlock(&lw_lock);
+	return 0;
 }
 
 int rak_fw_lorawan_recv_format_and_clear(char *out, size_t out_len)

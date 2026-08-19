@@ -59,6 +59,16 @@ int rak_fw_lorawan_join_otaa_async(const uint8_t deveui[8], const uint8_t joineu
 int rak_fw_lorawan_join_stop(void);
 
 /**
+ * @brief Tear down LoRaMAC when leaving LoRaWAN mode (e.g. AT+NWM=0).
+ *
+ * Clears any joined session, deinitializes the MAC, and notifies join_status(false).
+ * Must not be called while Join/Send is in progress.
+ *
+ * @return 0 on success; -EBUSY if a radio job is active or MAC stop fails.
+ */
+int rak_fw_lorawan_stop(void);
+
+/**
  * @brief Queue an uplink (non-blocking). Emits +EVT:TX_DONE on success and
  *        optional confirm EVTs.
  */
@@ -90,12 +100,30 @@ int rak_fw_lorawan_band_to_region(uint8_t band, enum lorawan_region *region);
 /** True if compiled-in stack supports this RUI3 band code. */
 bool rak_fw_lorawan_band_supported(uint8_t band);
 
+/**
+ * @brief Apply a RUI3 band code to the LoRaMAC region.
+ *
+ * When the stack is already started but idle (not joining, not joined, not
+ * busy), reinitializes LoRaMAC with the new region. When not started, only
+ * updates the region selected for the next @ref rak_fw_lorawan_ensure_started.
+ *
+ * @return 0 on success; -EBUSY if a session or RF job is active; other negative errno on failure.
+ */
+int rak_fw_lorawan_apply_band(uint8_t band);
+
 void rak_fw_lorawan_set_cfm(uint8_t cfm);
 uint8_t rak_fw_lorawan_get_cfm(void);
 uint8_t rak_fw_lorawan_get_cfs(void);
 
 void rak_fw_lorawan_set_adr(bool enable);
 bool rak_fw_lorawan_get_adr(void);
+
+/**
+ * @brief Read the current LoRaWAN DevAddr from the MAC (OTAA assigned when joined).
+ *
+ * @return 0 on success; -ENOTCONN if not joined / stack not started; other errno on MAC error.
+ */
+int rak_fw_lorawan_get_devaddr(uint32_t *devaddr);
 
 /**
  * @brief Format last downlink as RUI3 AT+RECV payload ("<port>:<hex>" or "0:").

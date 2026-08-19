@@ -39,6 +39,7 @@ enum rak_at_cfg_valid_bits {
 	RAK_AT_CFG_VALID_APPKEY = 1U << 5,
 	RAK_AT_CFG_VALID_NWKKEY = 1U << 6,
 	RAK_AT_CFG_VALID_LW_OPTS = 1U << 7,
+	RAK_AT_CFG_VALID_DEVADDR = 1U << 8,
 };
 
 /**
@@ -63,6 +64,8 @@ struct rak_at_runtime_cfg {
 	uint8_t join_auto;
 	uint8_t join_interval_s;
 	uint8_t join_attempts;
+	/** Stored ABP DevAddr (host-endian). OTAA Join overwrites live MAC value. */
+	uint32_t devaddr;
 };
 
 struct rak_at_cfg_ops {

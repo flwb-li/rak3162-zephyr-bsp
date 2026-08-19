@@ -72,9 +72,11 @@ there is no banner; send `AT` to confirm the console is alive.
 | Item | Notes |
 |------|-------|
 | Mode | System OFF (`sys_poweroff`) |
-| Optional wake | `AT+RTC=<seconds>` arms GRTC before sleep |
+| Optional wake | `AT+RTC=<seconds>` arms GRTC **immediately before** System OFF |
+| Auto uplink | Entering `AT+SLEEP` **cancels** `SENDINT` / join-retry works first |
+| Busy | Returns `AT_BUSY_ERROR` if Join/Send/P2P is in progress |
 | State | RAM and the active LoRaWAN data session are lost; OTAA runs again after reboot |
-| Prep | SX1262 warm sleep + ANT_SW off; LEDs, secondary buses, and LoRa SPI suspended |
+| Prep | Stop auto cycle → SX1262 warm sleep + ANT_SW off; LEDs, secondary buses, and LoRa SPI suspended |
 
 This explicit command is intentionally different from the automatic uplink
 cycle. Its GRTC wake is a reset-style cold boot (`RESET_CLOCK`), not a

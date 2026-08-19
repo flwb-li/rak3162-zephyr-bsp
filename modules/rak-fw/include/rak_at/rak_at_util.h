@@ -20,6 +20,13 @@ void rak_at_str_to_upper(char *s);
 int rak_at_parse_hex_bytes(const char *hex, size_t hex_len, uint8_t *buf, size_t buf_len);
 void rak_at_bytes_to_hex_upper(const uint8_t *src, size_t len, char *dst);
 
+/**
+ * Parse a full decimal string into @p out.
+ * Rejects empty, sign, whitespace, trailing junk, and overflow.
+ * @return 0 on success, -EINVAL otherwise.
+ */
+int rak_at_parse_ulong(const char *s, unsigned long *out);
+
 #ifdef __cplusplus
 }
 #endif

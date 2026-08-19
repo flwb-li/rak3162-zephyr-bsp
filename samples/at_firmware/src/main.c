@@ -45,8 +45,10 @@ LOG_MODULE_REGISTER(at_firmware, LOG_LEVEL_INF);
 
 static struct k_work_delayable uplink_work;
 static struct k_work_delayable join_retry_work;
+static struct k_mutex cycle_lock;
 static bool cycle_started;
 static bool uplink_in_flight;
+static bool sleep_requested;
 static int64_t uplink_mark_ms;
 
 static uint32_t app_send_interval_ms(void)
@@ -56,7 +58,29 @@ static uint32_t app_send_interval_ms(void)
 
 static bool app_auto_uplink_enabled(void)
 {
-	return rak3162_storage_get_send_interval_s() != 0U;
+	return !sleep_requested && (rak3162_storage_get_send_interval_s() != 0U);
+}
+
+static void cancel_auto_cycle_works_locked(void)
+{
+	(void)k_work_cancel_delayable(&uplink_work);
+	(void)k_work_cancel_delayable(&join_retry_work);
+}
+
+static void stop_auto_uplink(void)
+{
+	struct k_work_sync sync;
+
+	k_mutex_lock(&cycle_lock, K_FOREVER);
+	cancel_auto_cycle_works_locked();
+	k_mutex_unlock(&cycle_lock);
+
+	/* Wait for a handler that already started; it must re-check before TX. */
+	(void)k_work_cancel_delayable_sync(&uplink_work, &sync);
+
+	k_mutex_lock(&cycle_lock, K_FOREVER);
+	cancel_auto_cycle_works_locked();
+	k_mutex_unlock(&cycle_lock);
 }
 
 static void log_reset_cause(void)
@@ -102,15 +126,27 @@ static void schedule_next_uplink(uint32_t minimum_idle_ms, bool compensate_inter
 {
 	uint32_t delay_ms;
 
+	k_mutex_lock(&cycle_lock, K_FOREVER);
+
 	if (!app_auto_uplink_enabled()) {
 		(void)k_work_cancel_delayable(&uplink_work);
-		LOG_INF("Auto uplink disabled (AT+SENDINT=0); use AT+SEND");
+		k_mutex_unlock(&cycle_lock);
+		if (!sleep_requested) {
+			LOG_INF("Auto uplink disabled (AT+SENDINT=0); use AT+SEND");
+		}
 		return;
 	}
 
 	delay_ms = compute_next_uplink_delay_ms(compensate_interval);
 	if (delay_ms < minimum_idle_ms) {
 		delay_ms = minimum_idle_ms;
+	}
+
+	/* Re-check immediately before arming GRTC so AT+SENDINT=0 cannot lose a race. */
+	if (!app_auto_uplink_enabled()) {
+		(void)k_work_cancel_delayable(&uplink_work);
+		k_mutex_unlock(&cycle_lock);
+		return;
 	}
 
 	/*
@@ -120,6 +156,19 @@ static void schedule_next_uplink(uint32_t minimum_idle_ms, bool compensate_inter
 	LOG_INF("System ON idle %u ms (GRTC, target TX interval %u s)", delay_ms,
 		rak3162_storage_get_send_interval_s());
 	(void)k_work_reschedule(&uplink_work, K_MSEC(delay_ms));
+	k_mutex_unlock(&cycle_lock);
+}
+
+static void schedule_uplink_now(void)
+{
+	k_mutex_lock(&cycle_lock, K_FOREVER);
+	if (!app_auto_uplink_enabled()) {
+		(void)k_work_cancel_delayable(&uplink_work);
+		k_mutex_unlock(&cycle_lock);
+		return;
+	}
+	(void)k_work_reschedule(&uplink_work, K_NO_WAIT);
+	k_mutex_unlock(&cycle_lock);
 }
 
 static bool lorawan_mode_active(void)
@@ -141,8 +190,15 @@ static void join_retry_work_handler(struct k_work *work)
 
 static void schedule_join_retry(uint32_t delay_ms)
 {
+	k_mutex_lock(&cycle_lock, K_FOREVER);
+	if (sleep_requested) {
+		k_mutex_unlock(&cycle_lock);
+		return;
+	}
+
 	LOG_INF("Join retry in %u ms (System ON/GRTC)", delay_ms);
 	(void)k_work_reschedule(&join_retry_work, K_MSEC(delay_ms));
+	k_mutex_unlock(&cycle_lock);
 }
 
 static void uplink_work_handler(struct k_work *work)
@@ -166,6 +222,10 @@ static void uplink_work_handler(struct k_work *work)
 		return;
 	}
 
+	if (!app_auto_uplink_enabled()) {
+		return;
+	}
+
 	ret = rak_fw_lorawan_get_uplink_counter(&uplink_counter);
 	if (ret != 0) {
 		LOG_WRN("FCnt read failed: %d", ret);
@@ -184,7 +244,11 @@ static void uplink_work_handler(struct k_work *work)
 	}
 
 	if (ret == -EBUSY) {
-		(void)k_work_reschedule(&uplink_work, K_MSEC(100U));
+		k_mutex_lock(&cycle_lock, K_FOREVER);
+		if (app_auto_uplink_enabled()) {
+			(void)k_work_reschedule(&uplink_work, K_MSEC(100U));
+		}
+		k_mutex_unlock(&cycle_lock);
 		return;
 	}
 
@@ -194,6 +258,11 @@ static void uplink_work_handler(struct k_work *work)
 
 static void on_send_done(int result)
 {
+	if (sleep_requested) {
+		uplink_in_flight = false;
+		return;
+	}
+
 	if (!uplink_in_flight) {
 		return;
 	}
@@ -215,12 +284,17 @@ static void on_send_done(int result)
 
 static void on_join_status(bool joined)
 {
+	if (sleep_requested) {
+		uplink_in_flight = false;
+		return;
+	}
+
 	if (joined) {
 		(void)k_work_cancel_delayable(&join_retry_work);
 		if (cycle_started) {
 			uplink_in_flight = false;
 			if (app_auto_uplink_enabled()) {
-				(void)k_work_reschedule(&uplink_work, K_NO_WAIT);
+				schedule_uplink_now();
 			} else {
 				radio_bind_prepare_system_on_idle();
 			}
@@ -236,13 +310,42 @@ static void on_join_status(bool joined)
 		}
 
 		LOG_INF("LoRaWAN session ready: send one Port%u uplink", APP_UPLINK_PORT);
-		(void)k_work_reschedule(&uplink_work, K_NO_WAIT);
+		schedule_uplink_now();
 		return;
 	}
 
 	LOG_WRN("Join unavailable; retry after full interval");
 	radio_bind_prepare_system_on_idle();
+
+	{
+		struct rak_at_runtime_cfg cfg;
+
+		rak_at_cfg_get_active(&cfg);
+		if (cfg.nwm != RAK_AT_NWM_LORAWAN) {
+			stop_auto_uplink();
+			cycle_started = false;
+			uplink_in_flight = false;
+			(void)k_work_cancel_delayable(&join_retry_work);
+			return;
+		}
+		if (cfg.join_auto == 0U) {
+			(void)k_work_cancel_delayable(&join_retry_work);
+			return;
+		}
+	}
+
 	schedule_join_retry(APP_JOIN_RETRY_MS);
+}
+
+/** Called from AT+SLEEP prepare_poweroff: stop periodic TX before System OFF. */
+static void app_prepare_sleep(void)
+{
+	sleep_requested = true;
+	stop_auto_uplink();
+	cycle_started = false;
+	uplink_in_flight = false;
+	(void)rak_fw_lorawan_join_stop();
+	LOG_INF("Auto uplink/join cycle stopped for AT+SLEEP");
 }
 
 static int seed_test_otaa_creds_if_needed(struct rak_at_runtime_cfg *cfg)
@@ -354,8 +457,7 @@ static void autojoin_on_boot(void)
 
 static int cmd_sendint(const struct rak_at_request *req)
 {
-	uint32_t interval_s;
-	char *end = NULL;
+	unsigned long interval_ul;
 
 	if (req->form == RAK_AT_FORM_HELP) {
 		rak_at_resp_line(
@@ -376,22 +478,23 @@ static int cmd_sendint(const struct rak_at_request *req)
 		return -EINVAL;
 	}
 
-	interval_s = (uint32_t)strtoul(req->args, &end, 10);
-	if ((end == req->args) || (*end != '\0') || (interval_s > RAK3162_SENDINT_MAX_S)) {
+	if ((rak_at_parse_ulong(req->args, &interval_ul) != 0) ||
+	    (interval_ul > RAK3162_SENDINT_MAX_S)) {
 		rak_at_resp_line("AT_PARAM_ERROR");
 		return -EINVAL;
 	}
 
-	if (rak3162_storage_set_send_interval_s(interval_s) != 0) {
+	if (rak3162_storage_set_send_interval_s((uint32_t)interval_ul) != 0) {
 		rak_at_resp_error(NULL);
 		return -EIO;
 	}
 
-	if (interval_s == 0U) {
-		(void)k_work_cancel_delayable(&uplink_work);
+	if (interval_ul == 0U) {
+		stop_auto_uplink();
 		if (cycle_started && !uplink_in_flight) {
 			radio_bind_prepare_system_on_idle();
 		}
+		LOG_INF("AT+SENDINT=0: auto uplink stopped");
 	} else if (cycle_started && rak_fw_lorawan_is_joined() && !uplink_in_flight) {
 		schedule_next_uplink(0U, false);
 	}
@@ -402,10 +505,12 @@ static int cmd_sendint(const struct rak_at_request *req)
 
 static void app_policy_start(void)
 {
+	k_mutex_init(&cycle_lock);
 	k_work_init_delayable(&uplink_work, uplink_work_handler);
 	k_work_init_delayable(&join_retry_work, join_retry_work_handler);
 	rak_fw_lorawan_set_join_status_cb(on_join_status);
 	rak_fw_lorawan_set_send_done_cb(on_send_done);
+	radio_bind_set_pre_sleep_cb(app_prepare_sleep);
 	(void)rak_at_register_command("SENDINT", cmd_sendint, "AT+SENDINT");
 	autojoin_on_boot();
 }

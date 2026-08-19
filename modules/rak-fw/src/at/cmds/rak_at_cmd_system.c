@@ -15,7 +15,14 @@
 
 #include <rak_at/rak_at.h>
 #include <rak_at/rak_at_cfg.h>
+#include <rak_at/rak_at_util.h>
 #include <rak_fw/board.h>
+#if defined(CONFIG_RAK_AT_LORAWAN)
+#include <rak_fw/lorawan.h>
+#endif
+#if defined(CONFIG_RAK_AT_LORA_P2P)
+#include <rak_fw/lora_p2p.h>
+#endif
 
 LOG_MODULE_REGISTER(rak_at_sys, LOG_LEVEL_INF);
 
@@ -108,7 +115,7 @@ static int cmd_sleep(const struct rak_at_request *req)
 
 	if (req->form == RAK_AT_FORM_HELP) {
 		rak_at_resp_line("AT+SLEEP=<delay_ms>");
-		rak_at_resp_line("Delay then enter System OFF (optional RTC wakeup via AT+RTC)");
+		rak_at_resp_line("Delay then enter System OFF (stops SENDINT; optional RTC via AT+RTC)");
 		rak_at_resp_ok();
 		return 0;
 	}
@@ -116,7 +123,7 @@ static int cmd_sleep(const struct rak_at_request *req)
 	if (req->form == RAK_AT_FORM_SET) {
 		unsigned long delay_ms = 0;
 
-		if ((req->args == NULL) || (sscanf(req->args, "%lu", &delay_ms) != 1)) {
+		if (rak_at_parse_ulong(req->args, &delay_ms) != 0) {
 			rak_at_resp_line("AT_PARAM_ERROR");
 			return -EINVAL;
 		}
@@ -126,26 +133,51 @@ static int cmd_sleep(const struct rak_at_request *req)
 			return -ENOTSUP;
 		}
 
+		if ((rtc_wakeup_delay_s > 0U) && (bops->arm_rtc_wakeup_s == NULL)) {
+			rak_at_resp_line("RTC_WAKEUP_ERROR");
+			return -ENOTSUP;
+		}
+
+#if defined(CONFIG_RAK_AT_LORAWAN)
+		if (rak_fw_lorawan_is_busy()) {
+			rak_at_resp_line("AT_BUSY_ERROR");
+			return -EBUSY;
+		}
+#endif
+#if defined(CONFIG_RAK_AT_LORA_P2P)
+		if (rak_fw_lora_p2p_is_busy()) {
+			rak_at_resp_line("AT_BUSY_ERROR");
+			return -EBUSY;
+		}
+#endif
+
+		rak_at_resp_ok();
+
+		/* Stop auto uplink / join retry before radio poweroff. */
+		if (bops->prepare_poweroff != NULL) {
+			bops->prepare_poweroff();
+		}
+
+		/*
+		 * Delay first, then arm RTC immediately before System OFF so the
+		 * wake interval is measured from poweroff entry (not from OK).
+		 */
+		if (delay_ms > 0UL) {
+			k_msleep((uint32_t)delay_ms);
+		}
+
 		if (rtc_wakeup_delay_s > 0U) {
-			if (bops->arm_rtc_wakeup_s == NULL) {
-				rak_at_resp_line("RTC_WAKEUP_ERROR");
-				return -ENOTSUP;
-			}
 			int ret = bops->arm_rtc_wakeup_s(rtc_wakeup_delay_s);
 
 			if (ret != 0) {
 				LOG_WRN("RTC wakeup prepare failed: %d", ret);
-				rak_at_resp_line("RTC_WAKEUP_ERROR");
-				return ret;
+				/* Already replied OK; still enter System OFF. */
+			} else {
+				LOG_INF("RTC wakeup armed: %u s", rtc_wakeup_delay_s);
 			}
-			LOG_INF("RTC wakeup armed: %u s", rtc_wakeup_delay_s);
 		}
 
-		rak_at_resp_ok();
-		if (bops->prepare_poweroff != NULL) {
-			bops->prepare_poweroff();
-		}
-		bops->enter_system_off((uint32_t)delay_ms);
+		bops->enter_system_off(0U);
 		return 0;
 	}
 
@@ -172,8 +204,7 @@ static int cmd_rtc(const struct rak_at_request *req)
 	if (req->form == RAK_AT_FORM_SET) {
 		unsigned long v = 0U;
 
-		if ((req->args == NULL) || (sscanf(req->args, "%lu", &v) != 1) ||
-		    (v > UINT32_MAX)) {
+		if ((rak_at_parse_ulong(req->args, &v) != 0) || (v > UINT32_MAX)) {
 			rak_at_resp_line("AT_PARAM_ERROR");
 			return -EINVAL;
 		}

@@ -310,13 +310,10 @@ int rak_at_cmd_precv(const struct rak_at_request *req)
 	}
 
 	{
-		char *end = NULL;
 		unsigned long value;
 		int s;
 
-		errno = 0;
-		value = strtoul(req->args, &end, 10);
-		if ((errno != 0) || (end == req->args) || (*end != '\0') || (value > 65535UL)) {
+		if ((rak_at_parse_ulong(req->args, &value) != 0) || (value > 65535UL)) {
 			param_error();
 			return -EINVAL;
 		}

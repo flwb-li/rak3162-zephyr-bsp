@@ -7,6 +7,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <zephyr/sys/util.h>
@@ -73,4 +74,28 @@ void rak_at_bytes_to_hex_upper(const uint8_t *src, size_t len, char *dst)
 		dst[i * 2U + 1U] = hex[src[i] & 0x0F];
 	}
 	dst[len * 2U] = '\0';
+}
+
+int rak_at_parse_ulong(const char *s, unsigned long *out)
+{
+	char *end = NULL;
+	unsigned long v;
+
+	if ((s == NULL) || (s[0] == '\0') || (out == NULL)) {
+		return -EINVAL;
+	}
+
+	/* Digits only: no sign, whitespace, or leading junk. */
+	if (((unsigned char)s[0] < '0') || ((unsigned char)s[0] > '9')) {
+		return -EINVAL;
+	}
+
+	errno = 0;
+	v = strtoul(s, &end, 10);
+	if ((errno != 0) || (end == s) || (*end != '\0')) {
+		return -EINVAL;
+	}
+
+	*out = v;
+	return 0;
 }

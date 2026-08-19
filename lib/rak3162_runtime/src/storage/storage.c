@@ -75,12 +75,15 @@ static int rak3162_settings_set(const char *name, size_t len_rd, settings_read_c
 	ARG_UNUSED(len_rd);
 
 	if (strcmp(name, "active_cfg") == 0) {
-		ssize_t n = read_cb(cb_arg, &storage_state.active_cfg, sizeof(storage_state.active_cfg));
+		ssize_t n;
 
+		memset(&storage_state.active_cfg, 0, sizeof(storage_state.active_cfg));
+		n = read_cb(cb_arg, &storage_state.active_cfg, sizeof(storage_state.active_cfg));
 		if (n < 0) {
 			return (int)n;
 		}
-		if ((size_t)n != sizeof(storage_state.active_cfg)) {
+		/* Accept shorter legacy blobs; new trailing fields stay zero. */
+		if ((n == 0) || ((size_t)n > sizeof(storage_state.active_cfg))) {
 			memset(&storage_state.active_cfg, 0, sizeof(storage_state.active_cfg));
 		}
 		return 0;

@@ -7,6 +7,6 @@
 #define __CONFIG_H
 
 
-#define SOFTWARE_VERSION   "V_1.0.0"
+#define SOFTWARE_VERSION   "V_1.0.1"
 
 #endif

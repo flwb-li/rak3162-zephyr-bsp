@@ -109,6 +109,7 @@ Sample `at_firmware` implements product policy in the application (`src/main.c`)
    Radio operations run on a separate work queue; conflicting commands return `AT_BUSY_ERROR`.
    Note: Zephyr `CONFIG_PM` system states are **not** selected on nRF54L15 (`HAS_PM` absent).
 7. `AT+SLEEP` still enters **System OFF** (deep sleep); optional RTC wakeup via `AT+RTC`.
+   Before System OFF the firmware **stops** automatic `SENDINT` / join-retry works.
    System OFF cannot use AT UART wake the same way. Wake is a full reboot and
    requires a new OTAA join (automatically when `join_auto=1`).
 
@@ -143,8 +144,9 @@ LoRaWAN `JOIN` / `SEND` require `AT+NWM=1`.
 
 ### 4.2 `AT+BAND` — region
 
-RUI3 region numbers (default **4 = EU868**). Change before the first successful `lorawan_start()` / join.
-Persisted in Settings.
+RUI3 region numbers (default **4 = EU868**). Persisted in Settings.
+May be changed while idle (not joining / not sending). If currently joined,
+the session is dropped (`AT+NJS=0`) and a new OTAA is required.
 
 ---
 
@@ -169,6 +171,7 @@ is non-zero and are always unconfirmed.
 | Command | Description |
 |---------|-------------|
 | `AT+DEVEUI` / `AT+APPEUI` / `AT+APPKEY` / `AT+NWKKEY` | OTAA credentials (written to NVS immediately; changing them does **not** leave the current session by itself) |
+| `AT+DEVADDR` | Device address (8 hex chars). When OTAA-joined, `=?` returns the NS-assigned DevAddr. SET stores NVS for ABP prep (ABP join not implemented). |
 | `AT+JOIN` | `AT+JOIN=<cmd>:<auto>:<interval_s>:<attempts>`. `cmd=0` stops an in-progress join and stores `auto`. `cmd=1` starts a **new OTAA** even if currently joined. Does **not** stop `AT+SENDINT` by itself. |
 | `AT+NJS` | Local join status (`1` while the stack thinks it is joined) |
 | `AT+SENDINT` | Auto uplink interval in seconds (`0` = off, default `10`) |

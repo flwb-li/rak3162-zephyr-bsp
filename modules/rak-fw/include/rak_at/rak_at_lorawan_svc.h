@@ -22,6 +22,7 @@ struct rak_at_lorawan_ops {
 			       const uint8_t appkey[16], const uint8_t nwkkey[16],
 			       uint8_t interval_s, uint8_t attempts);
 	int (*join_stop)(void);
+	int (*stop)(void);
 	int (*send_async)(uint8_t port, const uint8_t *data, uint8_t len,
 			  enum lorawan_message_type type);
 	bool (*is_joined)(void);
@@ -29,11 +30,13 @@ struct rak_at_lorawan_ops {
 	bool (*is_busy)(void);
 	bool (*is_joining)(void);
 	bool (*band_supported)(uint8_t band);
+	int (*apply_band)(uint8_t band);
 	void (*set_cfm)(uint8_t cfm);
 	uint8_t (*get_cfm)(void);
 	uint8_t (*get_cfs)(void);
 	void (*set_adr)(bool enable);
 	bool (*get_adr)(void);
+	int (*get_devaddr)(uint32_t *devaddr);
 	int (*recv_format_and_clear)(char *out, size_t out_len);
 };
 

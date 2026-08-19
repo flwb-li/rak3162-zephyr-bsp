@@ -15,5 +15,6 @@ twister-out/
 twister-out*/
 
 # Local-only Chinese briefing/test docs (not published)
+README.zh-CN.md
 samples/at_firmware/doc/固件说明.md
 samples/at_firmware/doc/测试文档.md

@@ -32,6 +32,7 @@ LOG_MODULE_REGISTER(radio_bind, LOG_LEVEL_INF);
 
 static const struct device *const ant_sw_dev = DEVICE_DT_GET(DT_ALIAS(lora_ant_sw));
 static const struct device *const lora_spi_dev = DEVICE_DT_GET(DT_NODELABEL(spi22));
+static void (*pre_sleep_cb)(void);
 
 static void ant_sw_set(bool enable)
 {
@@ -111,6 +112,11 @@ static int board_arm_rtc_wakeup_s(uint32_t seconds)
 
 static void board_prepare_poweroff(void)
 {
+	/* App stops SENDINT / join-retry before radio/bus shutdown. */
+	if (pre_sleep_cb != NULL) {
+		pre_sleep_cb();
+	}
+
 	/* Warm sleep retains SX1262 configuration across MCU System OFF prep. */
 	rak_fw_lorawan_radio_cold_sleep();
 	lora_spi_pm_action(PM_DEVICE_ACTION_SUSPEND);
@@ -152,6 +158,11 @@ void radio_bind_prepare_system_on_idle(void)
 	rak_at_port_lp_enter();
 }
 
+void radio_bind_set_pre_sleep_cb(void (*cb)(void))
+{
+	pre_sleep_cb = cb;
+}
+
 static const struct rak_fw_board_ops board_ops = {
 	.rf_window_enter = board_rf_window_enter,
 	.rf_window_exit = board_rf_window_exit,
@@ -172,17 +183,20 @@ static const struct rak_at_lorawan_ops lorawan_ops = {
 	.ensure_started = rak_fw_lorawan_ensure_started,
 	.join_otaa_async = rak_fw_lorawan_join_otaa_async,
 	.join_stop = rak_fw_lorawan_join_stop,
+	.stop = rak_fw_lorawan_stop,
 	.send_async = rak_fw_lorawan_send_async,
 	.is_joined = rak_fw_lorawan_is_joined,
 	.is_started = rak_fw_lorawan_is_started,
 	.is_busy = rak_fw_lorawan_is_busy,
 	.is_joining = rak_fw_lorawan_is_joining,
 	.band_supported = rak_fw_lorawan_band_supported,
+	.apply_band = rak_fw_lorawan_apply_band,
 	.set_cfm = rak_fw_lorawan_set_cfm,
 	.get_cfm = rak_fw_lorawan_get_cfm,
 	.get_cfs = rak_fw_lorawan_get_cfs,
 	.set_adr = rak_fw_lorawan_set_adr,
 	.get_adr = rak_fw_lorawan_get_adr,
+	.get_devaddr = rak_fw_lorawan_get_devaddr,
 	.recv_format_and_clear = rak_fw_lorawan_recv_format_and_clear,
 };
 

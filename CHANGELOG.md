@@ -5,6 +5,53 @@ All notable changes to the RAK3162 Zephyr BSP are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-08-19
+
+Firmware test follow-up: AT parameter hardening, System OFF sleep/wake, and
+`AT+SENDINT=0` stop reliability. `AT+VER` reports `V_1.0.1`.
+
+### Fixed
+
+- `AT+BAND` illegal values (`99` / `9` / `0` / empty / trailing junk) now return
+  `AT_PARAM_ERROR` instead of a sticky `AT_BUSY_ERROR` (validate before busy)
+- `AT+BAND` after `AT+JOIN=0:0` (stack started but join idle) now returns `OK`
+  instead of `AT_BUSY_ERROR`; region is reapplied via LoRaMAC reinit when needed
+- `AT+BAND` while idle-joined (e.g. after `AT+SENDINT=0`) now returns `OK`,
+  drops the session (`NJS=0`) and re-inits the region; still `AT_BUSY_ERROR`
+  during Join/Send
+- Added `AT+DEVADDR` (RUI3): GET returns NS DevAddr when joined, else stored NVS;
+  SET persists 8 hex digits (ABP join still not implemented)
+- `AT+BAND` now takes effect on the radio: LoRaMAC NVM no longer restores the
+  previous region's EU868 (etc.) channels after a region change
+- Periodic `+EVT:TX_DONE` no longer prints while AT UART is in Sense/suspend
+  (garbled `+Q...` lines); events are emitted before UART LP enter
+- OTAA join no longer waits forever for MLME (20 s timeout + MAC reset) after
+  a radio/DIO1 stall; `AT+JOIN=1:0:8:0` still retries until stop (no JOIN FAILED)
+- `AT+JOIN` after `AT+BAND` no longer hangs silently: `SX126xWakeup()` runs on
+  every RF window when the stack is started (DIO1 re-enabled after MAC deinit)
+- `AT+NWM=0` now deinitializes LoRaMAC and clears the session so P2P can run and
+  `AT+NJS` returns 0 (was stuck Busy / NJS=1 after a prior Join)
+- `AT+JOIN=0` during an in-flight OTAA attempt discards a late Join success (no
+  `+EVT:JOINED` / session keep) once `lorawan_join()` returns
+- `AT+SLEEP` now stops `SENDINT` / join-retry before System OFF; Join/Send/P2P
+  in progress returns `AT_BUSY_ERROR`
+- `AT+RTC` is armed **after** `AT+SLEEP` delay and immediately before
+  `sys_poweroff`, so the wake interval starts at deep-sleep entry (not at `OK`)
+- `AT+JOIN=1` could HardFault immediately after `OK` (`BFAR=0x4` in
+  `RegionEU868InitDefaults` RESET): re-bind region NVM pointers from params
+  before touching channels; resume RF/SPI before `lorawan_start`; enlarge
+  LoRaWAN work-queue stack
+- `AT+CFM` / `AT+ADR` / `AT+NWM` / `AT+NJM` / `AT+JOIN` / `AT+SEND` /
+  `AT+SLEEP` / `AT+RTC` / `AT+SENDINT` / `AT+PRECV` reject empty args, signs,
+  and trailing junk via `rak_at_parse_ulong()`
+
+### Changed
+
+- `SOFTWARE_VERSION` → `V_1.0.1` (`lib/rak3162_runtime/src/config.h`, `AT+VER`)
+- `AT+SLEEP` help notes that entering System OFF stops the auto-uplink cycle
+- `LOW_POWER.md` / `AT_COMMANDS.md`: System OFF prep and RTC-arm timing
+- README: Windows native setup pitfalls; `west flash` (default J-Link)
+
 ## [1.0.0] - 2026-08-14
 
 First public release of the RAK3162 Zephyr BSP.
@@ -25,8 +72,8 @@ development (OTAA Class A + LoRa P2P). Not a full RUI3 firmware replacement.
   `AT+BAND` / `AT+JOIN` / `AT+SEND` / `AT+RECV`, downlink `+EVT:RX_1:...`
 - LoRa P2P (Zephyr `CONFIG_LORA`): `AT+P2P` / `AT+PRECV` / `AT+PSEND` / `AT+CW`
 - Practical AT command subset (RUI3-inspired); see `samples/at_firmware/doc/AT_COMMANDS.md`
-- Docs: Docker-first README (incl. Windows / WSL2 notes), `AT_COMMANDS.md`,
-  `LOW_POWER.md`
+- Docs: Docker-first README (incl. Windows / WSL2 notes), Mode 2 native Windows
+  toolchain install (no Docker), `AT_COMMANDS.md`, `LOW_POWER.md`
 - West workspace via `west.yml` (minimal modules: `cmsis`, `cmsis_6`,
   `hal_nordic`, `loramac-node`); optional deprecated `scripts/bootstrap.sh`
 - Hardware pin notes under `boards/rak3162/doc/`

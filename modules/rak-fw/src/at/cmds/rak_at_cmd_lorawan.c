@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
 static const struct rak_at_lorawan_ops *lw(void)
@@ -211,12 +212,7 @@ int rak_at_cmd_nwm(const struct rak_at_request *req)
 		return -EINVAL;
 	}
 
-	v = strtoul(req->args, NULL, 10);
-	if (v == 2UL) {
-		param_error();
-		return -EINVAL;
-	}
-	if ((v != 0UL) && (v != 1UL)) {
+	if ((rak_at_parse_ulong(req->args, &v) != 0) || ((v != 0UL) && (v != 1UL))) {
 		param_error();
 		return -EINVAL;
 	}
@@ -243,6 +239,24 @@ int rak_at_cmd_nwm(const struct rak_at_request *req)
 		return -EIO;
 	}
 
+	/* Leaving LoRaWAN: tear down MAC so P2P can use the radio and NJS clears. */
+	if (v == (unsigned long)RAK_AT_NWM_P2P_LORA) {
+		int ret = lw()->stop();
+
+		if (ret == -EBUSY) {
+			cfg.nwm = RAK_AT_NWM_LORAWAN;
+			(void)save_cfg(&cfg);
+			busy_error();
+			return -EBUSY;
+		}
+		if (ret != 0) {
+			cfg.nwm = RAK_AT_NWM_LORAWAN;
+			(void)save_cfg(&cfg);
+			rak_at_resp_error(NULL);
+			return ret;
+		}
+	}
+
 	rak_at_resp_ok();
 	return 0;
 }
@@ -251,6 +265,7 @@ int rak_at_cmd_band(const struct rak_at_request *req)
 {
 	struct rak_at_runtime_cfg cfg;
 	unsigned long v;
+	int ret;
 
 	if (req->form == RAK_AT_FORM_HELP) {
 		rak_at_resp_line(
@@ -272,13 +287,11 @@ int rak_at_cmd_band(const struct rak_at_request *req)
 		return -EINVAL;
 	}
 
-	if (lw()->is_started() || lw()->is_busy()) {
-		busy_error();
-		return -EBUSY;
-	}
-
-	v = strtoul(req->args, NULL, 10);
-	if ((v > 12UL) || !lw()->band_supported((uint8_t)v)) {
+	/* Validate args before busy/started checks so illegal values always
+	 * return AT_PARAM_ERROR (never sticky AT_BUSY_ERROR).
+	 */
+	if ((rak_at_parse_ulong(req->args, &v) != 0) || (v > 12UL) ||
+	    !lw()->band_supported((uint8_t)v)) {
 		param_error();
 		return -EINVAL;
 	}
@@ -286,6 +299,24 @@ int rak_at_cmd_band(const struct rak_at_request *req)
 	if ((uint8_t)v == cfg.band) {
 		rak_at_resp_ok();
 		return 0;
+	}
+
+	/* Block only during join / uplink. An idle joined session is dropped
+	 * and re-initialized for the new region (rejoin required).
+	 */
+	if (lw()->is_busy() || lw()->is_joining()) {
+		busy_error();
+		return -EBUSY;
+	}
+
+	ret = lw()->apply_band((uint8_t)v);
+	if (ret == -EBUSY) {
+		busy_error();
+		return -EBUSY;
+	}
+	if (ret != 0) {
+		rak_at_resp_error(NULL);
+		return ret;
 	}
 
 	cfg.band = (uint8_t)v;
@@ -323,8 +354,7 @@ int rak_at_cmd_cfm(const struct rak_at_request *req)
 		return -EINVAL;
 	}
 
-	v = strtoul(req->args, NULL, 10);
-	if ((v != 0UL) && (v != 1UL)) {
+	if ((rak_at_parse_ulong(req->args, &v) != 0) || ((v != 0UL) && (v != 1UL))) {
 		param_error();
 		return -EINVAL;
 	}
@@ -378,6 +408,65 @@ int rak_at_cmd_njs(const struct rak_at_request *req)
 	return 0;
 }
 
+int rak_at_cmd_devaddr(const struct rak_at_request *req)
+{
+	struct rak_at_runtime_cfg cfg;
+	uint32_t addr = 0U;
+	char hex[9];
+
+	if (req->form == RAK_AT_FORM_HELP) {
+		rak_at_resp_line("AT+DEVADDR: Get or Set the Device address");
+		rak_at_resp_ok();
+		return 0;
+	}
+
+	rak_at_cfg_get_active(&cfg);
+
+	if (req->form == RAK_AT_FORM_GET) {
+		/* RUI3 OTAA: when joined, return NS-assigned DevAddr from the MAC. */
+		if (lw()->is_joined() && (lw()->get_devaddr != NULL) &&
+		    (lw()->get_devaddr(&addr) == 0)) {
+			(void)snprintk(hex, sizeof(hex), "%08X", addr);
+			rak_at_resp_line("AT+DEVADDR=%s", hex);
+			rak_at_resp_ok();
+			return 0;
+		}
+
+		if ((cfg.valid_mask & RAK_AT_CFG_VALID_DEVADDR) == 0U) {
+			rak_at_resp_line("AT+DEVADDR=");
+			rak_at_resp_ok();
+			return 0;
+		}
+
+		(void)snprintk(hex, sizeof(hex), "%08X", cfg.devaddr);
+		rak_at_resp_line("AT+DEVADDR=%s", hex);
+		rak_at_resp_ok();
+		return 0;
+	}
+
+	if (req->form != RAK_AT_FORM_SET) {
+		param_error();
+		return -EINVAL;
+	}
+
+	/* Exactly 8 hex digits (4 bytes), same as RUI3. */
+	if ((req->args == NULL) || (strlen(req->args) != 8U) || !hex_valid_n(req->args, 8U)) {
+		param_error();
+		return -EINVAL;
+	}
+
+	addr = (uint32_t)strtoul(req->args, NULL, 16);
+	cfg.devaddr = addr;
+	cfg.valid_mask |= RAK_AT_CFG_VALID_DEVADDR;
+	if (save_cfg(&cfg) != 0) {
+		rak_at_resp_error(NULL);
+		return -EIO;
+	}
+
+	rak_at_resp_ok();
+	return 0;
+}
+
 int rak_at_cmd_njm(const struct rak_at_request *req)
 {
 	if (req->form == RAK_AT_FORM_HELP) {
@@ -393,9 +482,9 @@ int rak_at_cmd_njm(const struct rak_at_request *req)
 	}
 
 	if (req->form == RAK_AT_FORM_SET) {
-		unsigned long v = strtoul(req->args, NULL, 10);
+		unsigned long v;
 
-		if (v != 1UL) {
+		if ((rak_at_parse_ulong(req->args, &v) != 0) || (v != 1UL)) {
 			param_error();
 			return -EINVAL;
 		}
@@ -431,8 +520,7 @@ int rak_at_cmd_adr(const struct rak_at_request *req)
 		return -EINVAL;
 	}
 
-	v = strtoul(req->args, NULL, 10);
-	if ((v != 0UL) && (v != 1UL)) {
+	if ((rak_at_parse_ulong(req->args, &v) != 0) || ((v != 0UL) && (v != 1UL))) {
 		param_error();
 		return -EINVAL;
 	}
@@ -540,17 +628,35 @@ int rak_at_cmd_join(const struct rak_at_request *req)
 			param_error();
 			return -EINVAL;
 		}
-		p1 = strtoul(tok, NULL, 10);
+		if (rak_at_parse_ulong(tok, &p1) != 0) {
+			param_error();
+			return -EINVAL;
+		}
 
 		tok = strtok_r(NULL, ":", &saveptr);
 		if (tok != NULL) {
-			p2 = strtoul(tok, NULL, 10);
+			if (rak_at_parse_ulong(tok, &p2) != 0) {
+				param_error();
+				return -EINVAL;
+			}
 			tok = strtok_r(NULL, ":", &saveptr);
 			if (tok != NULL) {
-				p3 = strtoul(tok, NULL, 10);
+				if (rak_at_parse_ulong(tok, &p3) != 0) {
+					param_error();
+					return -EINVAL;
+				}
 				tok = strtok_r(NULL, ":", &saveptr);
 				if (tok != NULL) {
-					p4 = strtoul(tok, NULL, 10);
+					if (rak_at_parse_ulong(tok, &p4) != 0) {
+						param_error();
+						return -EINVAL;
+					}
+					/* Reject trailing fields beyond Param4. */
+					tok = strtok_r(NULL, ":", &saveptr);
+					if (tok != NULL) {
+						param_error();
+						return -EINVAL;
+					}
 				}
 			}
 		}
@@ -675,8 +781,8 @@ int rak_at_cmd_send(const struct rak_at_request *req)
 		return -EINVAL;
 	}
 
-	port_ul = strtoul(port_str, NULL, 10);
-	if ((port_ul == 0UL) || (port_ul > 233UL)) {
+	if ((rak_at_parse_ulong(port_str, &port_ul) != 0) || (port_ul == 0UL) ||
+	    (port_ul > 233UL)) {
 		param_error();
 		return -EINVAL;
 	}
@@ -765,6 +871,7 @@ void rak_at_register_lorawan_commands(void)
 	(void)rak_at_register_command("CFM", rak_at_cmd_cfm, "AT+CFM");
 	(void)rak_at_register_command("CFS", rak_at_cmd_cfs, "AT+CFS");
 	(void)rak_at_register_command("NJS", rak_at_cmd_njs, "AT+NJS");
+	(void)rak_at_register_command("DEVADDR", rak_at_cmd_devaddr, "AT+DEVADDR");
 	(void)rak_at_register_command("NJM", rak_at_cmd_njm, "AT+NJM");
 	(void)rak_at_register_command("ADR", rak_at_cmd_adr, "AT+ADR");
 	(void)rak_at_register_command("RECV", rak_at_cmd_recv, "AT+RECV");
