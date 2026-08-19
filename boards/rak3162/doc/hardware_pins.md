@@ -68,7 +68,7 @@ SPDX-License-Identifier: Apache-2.0
 
 | GPIO | Pin | Description |
 |------|-----|-------------|
-| GPIO1 | P1.08 | MCUboot DFU enter (`mcuboot-button0`): hold low through reset |
+| GPIO1 | P1.08 | |
 | GPIO2 | P1.14 | Can also be used as AIN7 |
 | GPIO3 | P2.03 | |
 | GPIO4 | P2.06 | |

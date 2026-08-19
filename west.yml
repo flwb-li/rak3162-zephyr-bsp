@@ -20,10 +20,6 @@ manifest:
           - cmsis
           - hal_nordic
           - loramac-node
-          # Serial DFU (MCUboot + signature verify + SMP CBOR)
-          - mcuboot
-          - mbedtls
-          - zcbor
 
   self:
     path: rak3162-zephyr-bsp
