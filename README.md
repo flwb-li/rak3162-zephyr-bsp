@@ -334,7 +334,7 @@ Manual SDK: extract `zephyr-sdk-0.17.4_linux-x86_64.tar.xz` under `$HOME`, then
 | Change keys | `AT+DEVEUI` / `AT+APPEUI` / `AT+APPKEY` (persisted) |
 | Auto uplink | `AT+SENDINT` (default `10`; `0` disables) — Port 2, 4-byte BE FCnt, unconfirmed |
 | ADR | ON by default |
-| Boot print | None (`CONFIG_LOG=n`); send `AT` after reset to confirm liveness |
+| Boot print | On reset: AT command list (same as `AT?`) then `OK` |
 
 ## Flash / console
 

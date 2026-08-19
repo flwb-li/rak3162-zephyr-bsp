@@ -186,6 +186,13 @@ int rak_at_register_command(const char *name, rak_at_handler_t handler, const ch
 
 static int cmd_global_help(void)
 {
+	rak_at_print_command_list();
+	rak_at_resp_ok();
+	return 0;
+}
+
+void rak_at_print_command_list(void)
+{
 	rak_at_resp_line("- AT+<CMD>? : help on <CMD>");
 	rak_at_resp_line("- AT+<CMD> : run <CMD>");
 	rak_at_resp_line("- AT+<CMD>=<value> : set the value");
@@ -193,8 +200,6 @@ static int cmd_global_help(void)
 	for (size_t i = 0; i < command_count; i++) {
 		rak_at_resp_line("%s", command_table[i].help);
 	}
-	rak_at_resp_ok();
-	return 0;
 }
 
 static int cmd_atz(const struct rak_at_request *req)

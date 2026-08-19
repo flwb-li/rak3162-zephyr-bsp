@@ -56,6 +56,9 @@ void rak_at_rx_purge(void);
 
 void rak_at_process_line(char *line);
 
+/** Print registered AT command list (same body as AT?, without trailing OK). */
+void rak_at_print_command_list(void);
+
 void rak_at_resp_ok(void);
 void rak_at_resp_error(const char *err);
 void rak_at_resp_line(const char *fmt, ...);

@@ -36,7 +36,7 @@ MASK/TXP, `AT+RETY`, and similar.
 | TX / RX | P1.06 / P1.07 |
 | Line ending | Responses end with `\r\n` |
 | Echo | Enabled by default (`ATE1` / `ATE0` supported by framework) |
-| Boot print | None by default (`CONFIG_LOG=n`, `CONFIG_BOOT_BANNER=n`); after reset send `AT` to confirm liveness |
+| Boot print | On reset: `RAK3162 AT firmware ready` + AT command list (same as `AT?`) + `OK` |
 
 ---
 

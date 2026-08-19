@@ -565,6 +565,12 @@ int main(void)
 
 	app_policy_start();
 
+	/* Boot banner: full AT surface (includes SENDINT). UART settle for USB-UART. */
+	k_msleep(50);
+	rak_at_resp_line("RAK3162 AT firmware ready");
+	rak_at_print_command_list();
+	rak_at_resp_ok();
+
 	LOG_INF("zephyr_version: %s", KERNEL_VERSION_STRING);
 	LOG_INF("AT firmware ready (SENDINT=%u s, System ON idle)",
 		rak3162_storage_get_send_interval_s());
