@@ -130,12 +130,29 @@ directory** (nested layout → `rak3162-zephyr-bsp/samples/at_firmware`).
 1. Install [Python 3.12](https://www.python.org/downloads/) — enable **Add python.exe to PATH**.
    Multiple Pythons can coexist; create the venv with `py -3.12 -m venv .venv`.
 2. Install [Git for Windows](https://git-scm.com/download/win).
-3. Install CMake (≥ 3.28), Ninja, gperf, DTC, 7-Zip. Easiest with
-   [Chocolatey](https://chocolatey.org/) in an **Admin** PowerShell:
+3. Install CMake (≥ 3.28), Ninja, gperf, DTC, 7-Zip via
+   [Chocolatey](https://chocolatey.org/install) (**Admin** PowerShell).
+
+   If `choco` is not found, install Chocolatey first (official one-liner):
 
 ```powershell
+# Admin PowerShell — install Chocolatey
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = `
+  [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iex ((New-Object System.Net.WebClient).DownloadString(
+  'https://community.chocolatey.org/install.ps1'))
+```
+
+   Close the window, open a **new Admin** PowerShell, then:
+
+```powershell
+choco -v   # should print a version (e.g. 2.x)
 choco install cmake ninja gperf dtc-msys2 7zip wget -y
 ```
+
+   Official guide: https://chocolatey.org/install  
+   Skip the install script if `choco -v` already works (Chocolatey is already present).
 
 4. Open a **new** PowerShell and check:
 
