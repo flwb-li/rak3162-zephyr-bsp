@@ -35,15 +35,18 @@ Image tag: `rak3162-zephyr:4.3.0-sdk0.17.4` (Zephyr SDK **0.17.4**, tools for Ze
 
 ```bash
 docker compose -f rak3162-zephyr-bsp/docker/compose.yaml run --rm build \
-  west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build
+  west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware \
+  -d build --sysbuild
 ```
 
 Output appears under `./build` on the host workspace root.
 
 ## Flash
 
-Flash from the **host** with J-Link / nRF Util / pyOCD (USB). Use
-`build/zephyr/zephyr.hex` (or `.elf`).
+Flash from the **host** with J-Link / nRF Util / pyOCD (USB). Build with
+`--sysbuild` so MCUboot + signed app are produced; `west flash -d build` programs
+both. Serial DFU after the first SWD flash: see the main README (hold P1.08,
+upload `zephyr.signed.bin` via mcumgr).
 
 ## Modules
 

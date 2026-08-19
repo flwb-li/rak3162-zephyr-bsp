@@ -30,7 +30,22 @@
 		zephyr,flash        = &cpuapp_rram;
 		zephyr,console      = &uart20;
 		zephyr,shell-uart   = &uart20;
+		/* MCUboot serial recovery / mcumgr SMP on the AT UART */
+		zephyr,uart-mcumgr = &uart20;
 		zephyr,lorawan-transceiver = &lora_rak_sx1262;
+	};
+
+	/*
+	 * DFU enter: hold GPIO1 (P1.08) low through reset to enter MCUboot
+	 * serial recovery (see samples/at_firmware serial DFU notes).
+	 */
+	buttons {
+		compatible = "gpio-keys";
+
+		dfu_btn: dfu_btn {
+			gpios = <&gpio1 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "DFU";
+		};
 	};
 
 	/* ANT_SW: P0.00 → R5 (100Ω) → RTC66006 VDD
@@ -50,6 +65,8 @@
 		lora0 = &lora_rak_sx1262;
 		lora-ant-sw = &lora_ant_sw;
 		lora-transceiver = &lora_rak_sx1262;
+		mcuboot-button0 = &dfu_btn;
+		mcuboot-led0 = &led0;
 	};
 };
 

@@ -36,7 +36,8 @@ Mode: **`AT+NWM`** (`0`=P2P, `1`=LoRaWAN). Region: **`AT+BAND`** (default EU868)
 ## Requirements
 
 - **Docker** (recommended) **or** a west workspace with Zephyr v4.3.0 + SDK **0.17.4**
-- **SWD** probe on the **host** (J-Link / CMSIS-DAP / pyOCD). No USB / serial DFU in this tree.
+- **SWD** probe on the **host** (J-Link / CMSIS-DAP / pyOCD) for the **first** flash
+  (MCUboot + app). Later field upgrades can use **MCUboot serial recovery** on the AT UART.
 
 ### Windows note
 
@@ -67,10 +68,10 @@ workspace/                      # west workspace root (.west lives here)
 # from workspace root (Linux or WSL)
 docker compose -f rak3162-zephyr-bsp/docker/compose.yaml build
 docker compose -f rak3162-zephyr-bsp/docker/compose.yaml run --rm build \
-  west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build
+  west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build --sysbuild
 ```
 
-Hex/ELF: `build/zephyr/zephyr.hex` (flash from the host).  
+Hex/ELF: under `build/` (MCUboot + signed app). Flash from the host.  
 Details: [`docker/README.md`](docker/README.md).
 
 ## Mode 2 — West workspace
@@ -83,7 +84,7 @@ mkdir -p workspace && cd workspace
 git clone https://github.com/flwb-li/rak3162-zephyr-bsp.git
 west init -l rak3162-zephyr-bsp
 west update
-west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build
+west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build --sysbuild
 ```
 
 `samples/at_firmware/CMakeLists.txt` injects `modules/rak-fw` via `ZEPHYR_EXTRA_MODULES`.
@@ -130,12 +131,29 @@ directory** (nested layout → `rak3162-zephyr-bsp/samples/at_firmware`).
 1. Install [Python 3.12](https://www.python.org/downloads/) — enable **Add python.exe to PATH**.
    Multiple Pythons can coexist; create the venv with `py -3.12 -m venv .venv`.
 2. Install [Git for Windows](https://git-scm.com/download/win).
-3. Install CMake (≥ 3.28), Ninja, gperf, DTC, 7-Zip. Easiest with
-   [Chocolatey](https://chocolatey.org/) in an **Admin** PowerShell:
+3. Install CMake (≥ 3.28), Ninja, gperf, DTC, 7-Zip via
+   [Chocolatey](https://chocolatey.org/install) (**Admin** PowerShell).
+
+   If `choco` is not found, install Chocolatey first (official one-liner):
 
 ```powershell
+# Admin PowerShell — install Chocolatey
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = `
+  [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iex ((New-Object System.Net.WebClient).DownloadString(
+  'https://community.chocolatey.org/install.ps1'))
+```
+
+   Close the window, open a **new Admin** PowerShell, then:
+
+```powershell
+choco -v   # should print a version (e.g. 2.x)
 choco install cmake ninja gperf dtc-msys2 7zip wget -y
 ```
+
+   Official guide: https://chocolatey.org/install  
+   Skip the install script if `choco -v` already works (Chocolatey is already present).
 
 4. Open a **new** PowerShell and check:
 
@@ -258,10 +276,10 @@ Optional — persist for the user account (new terminals inherit them):
 ```powershell
 # C:\zephyr-ws , .venv active, SDK env vars set
 west topdir   # should print C:\zephyr-ws (or your workspace root)
-west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build
+west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build --sysbuild
 ```
 
-Output: `C:\zephyr-ws\build\zephyr\zephyr.hex`.
+Output: `C:\zephyr-ws\build\at_firmware\zephyr\zephyr.signed.bin` (and MCUboot under `build\mcuboot\`).
 
 **Windows troubleshooting**
 
@@ -303,7 +321,7 @@ cd zephyr
 west sdk install --version 0.17.4 -t arm-zephyr-eabi
 cd ..
 
-west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build
+west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware -d build --sysbuild
 ```
 
 Manual SDK: extract `zephyr-sdk-0.17.4_linux-x86_64.tar.xz` under `$HOME`, then
@@ -321,31 +339,43 @@ Manual SDK: extract `zephyr-sdk-0.17.4_linux-x86_64.tar.xz` under `$HOME`, then
 
 ## Flash / console
 
-Flash over **SWD** from the **host** (Docker containers do not expose USB SWD).
-After a successful `west build` in the same workspace, prefer **`west flash`**.
+### Build with MCUboot (required for serial DFU)
 
-Default board runner is **J-Link** (`boards/rak3162/board.cmake`:
-`BOARD_FLASH_RUNNER jlink`, device `nRF54L15_M33`).
+`samples/at_firmware` uses **sysbuild** so MCUboot and the app are built together.
+After `west update` (pulls `mcuboot` / `mbedtls` / `zcbor`), build with `--sysbuild`:
 
 ```bash
-# workspace root, same build dir as west build (-d build)
+west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware \
+  -d build --sysbuild
+```
+
+```powershell
+west build -b rak3162/nrf54l15/cpuapp rak3162-zephyr-bsp/samples/at_firmware `
+  -d build --sysbuild
+```
+
+Outputs (under the build dir):
+
+| Image | Path |
+|-------|------|
+| MCUboot | `build/mcuboot/zephyr/zephyr.hex` |
+| App (signed) | `build/at_firmware/zephyr/zephyr.signed.bin` |
+| Merged (SWD) | flashed by `west flash` (both images) |
+
+### First flash (SWD)
+
+Flash over **SWD** from the **host** (Docker containers do not expose USB SWD).
+Default runner is **J-Link** (`boards/rak3162/board.cmake`).
+
+```bash
 west flash -d build
 ```
 
 ```powershell
-# Windows native — J-Link software on PATH; probe connected
 west flash -d build
 ```
 
-Other runners supported by the board file:
-
-```bash
-west flash -d build --runner nrfutil
-west flash -d build --runner pyocd
-west flash -d build --runner nrfjprog
-```
-
-Requirements:
+Other runners: `--runner nrfutil` / `pyocd` / `nrfjprog`.
 
 | Runner | Host tool |
 |--------|-----------|
@@ -354,11 +384,37 @@ Requirements:
 | `pyocd` | `pip install pyocd` (in the workspace `.venv`) |
 | `nrfjprog` | nRF Command Line Tools |
 
-Manual fallback (without west):
+### Serial DFU (MCUboot recovery)
 
-```text
-nrfutil device program --firmware build/zephyr/zephyr.hex
+nRF54L15 has **no** ROM UART bootloader. Serial DFU needs MCUboot already on the
+device (first flash above).
+
+| Item | Value |
+|------|--------|
+| UART | `uart20` (AT port): TX=P1.06, RX=P1.07, **115200 8N1** |
+| Enter recovery | Hold **GPIO1 / P1.08** low, then reset / power-cycle; release after LED0 on |
+| Recovery indicator | **LED0** (P2.09) stays on in serial recovery |
+| Image | `build/at_firmware/zephyr/zephyr.signed.bin` (not the unsigned `.hex`) |
+
+Host tools: [AuTerm](https://github.com/thedjnK/AuTerm) (SMP) or
+[mcumgr CLI](https://github.com/apache/mynewt-mcumgr-cli).
+Do **not** send the binary with Tera Term “Send file”.
+
+```powershell
+# Example — adjust COM port; install mcumgr CLI separately
+mcumgr conn add serial type="serial" connstring="COM3,baud=115200"
+mcumgr -c serial image upload build\at_firmware\zephyr\zephyr.signed.bin
+mcumgr -c serial reset
 ```
+
+```bash
+mcumgr conn add serial type="serial" connstring="/dev/ttyUSB0,baud=115200"
+mcumgr -c serial image upload build/at_firmware/zephyr/zephyr.signed.bin
+mcumgr -c serial reset
+```
+
+After reset (without holding P1.08), MCUboot boots the new app. AT console is again
+on the same UART at 115200.
 
 AT UART: TX=P1.06, RX=P1.07, **115200 8N1** (PuTTY, Tera Term, etc.).
 
