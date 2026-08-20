@@ -25,7 +25,7 @@ SPDX-License-Identifier: Apache-2.0
 | Board name | Zephyr node | TX | RX | Description |
 |------------|-------------|----|----|-------------|
 | UART0 | `uart20` | P1.06 | P1.07 | Debug / AT console (`zephyr,console`) |
-| UART1 | `uart21` | P2.08 | P2.07 | Secondary UART (`AT+TEST=UART`) |
+| UART1 | `uart21` | P2.08 | P2.07 | Secondary UART |
 
 ## 3. I²C
 

@@ -34,6 +34,13 @@ static const struct device *const ant_sw_dev = DEVICE_DT_GET(DT_ALIAS(lora_ant_s
 static const struct device *const lora_spi_dev = DEVICE_DT_GET(DT_NODELABEL(spi22));
 static void (*pre_sleep_cb)(void);
 
+bool app_keep_awake(void);
+
+__attribute__((weak)) bool app_keep_awake(void)
+{
+	return false;
+}
+
 static void ant_sw_set(bool enable)
 {
 	int ret;
@@ -72,7 +79,7 @@ static void lorawan_rf_state_handler(bool active)
 {
 	if (active) {
 		rak_at_port_lp_exit();
-	} else {
+	} else if (!app_keep_awake()) {
 		rak_at_port_lp_enter();
 	}
 }
@@ -87,7 +94,9 @@ static void board_rf_window_enter(void)
 
 static void board_rf_window_exit(void)
 {
-	rak3162_bus_pm_suspend();
+	if (!app_keep_awake()) {
+		rak3162_bus_pm_suspend();
+	}
 	ant_sw_set(false);
 }
 
@@ -146,6 +155,10 @@ static void board_enter_system_off(uint32_t delay_ms)
 
 void radio_bind_prepare_system_on_idle(void)
 {
+	if (app_keep_awake()) {
+		return;
+	}
+
 	/*
 	 * RF-window exit normally performs these actions first. Keep this
 	 * function idempotent so join failures take the same low-power path.

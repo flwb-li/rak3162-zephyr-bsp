@@ -198,6 +198,9 @@ void rak_at_print_command_list(void)
 	rak_at_resp_line("- AT+<CMD>=<value> : set the value");
 	rak_at_resp_line("- AT+<CMD>=? : get the value");
 	for (size_t i = 0; i < command_count; i++) {
+		if (command_table[i].help == NULL) {
+			continue;
+		}
 		rak_at_resp_line("%s", command_table[i].help);
 	}
 }

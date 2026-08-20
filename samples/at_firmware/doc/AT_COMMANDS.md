@@ -23,7 +23,7 @@ Intended for **field / product use**: OTAA Class A, automatic join when credenti
 configurable automatic uplinks via `AT+SENDINT`, and **System ON idle** between RF windows
 (`AT+SLEEP` remains System OFF).
 Command style follows the [RUI3 AT Command Manual](https://docs.rakwireless.com/product-categories/software-apis-and-libraries/rui3/at-command-manual/) as a **practical subset**.
-Not implemented: ABP, Class B/C, P2P_FSK, CW / factory RF tests, LPSEND, LINKCHECK,
+Not implemented: ABP, Class B/C, P2P_FSK, CW, LPSEND, LINKCHECK,
 MASK/TXP, `AT+RETY`, and similar.
 
 ---
@@ -199,8 +199,6 @@ AT+P2P=868000000:7:125:0:8:14
 AT+PRECV=65535
 AT+PSEND=48656C6C6F
 ```
-
-Factory CW / BLE CW / `AT+TEST` commands are **removed** from product firmware.
 
 ---
 

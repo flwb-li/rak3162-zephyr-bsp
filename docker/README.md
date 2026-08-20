@@ -1,5 +1,8 @@
 # RAK3162 Zephyr Docker environment
 
+Optional. The BSP README recommends **Workbench for Zephyr** or **IDE for Zephyr**
+in VS Code; this image is for CLI builds without a local SDK.
+
 Lives in this BSP at `docker/`. Host needs **Docker** only (no local Zephyr SDK).
 
 The container bind-mounts the **west workspace root** (parent of `rak3162-zephyr-bsp/`),
@@ -11,7 +14,7 @@ The image is **Linux** (`ubuntu:22.04` + Zephyr SDK **linux-x86_64**). On Window
 **Docker Desktop with the WSL2 backend**.
 
 If the PC has **no WSL2** (e.g. some Windows Home setups), skip Docker and use
-**Mode 2 — native Windows** in the BSP [`README.md`](../README.md).
+**Mode 1 (VS Code)** in the BSP [`README.md`](../README.md).
 
 | Do | Avoid |
 |----|--------|

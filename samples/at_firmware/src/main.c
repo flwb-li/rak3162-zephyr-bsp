@@ -33,6 +33,8 @@
 
 LOG_MODULE_REGISTER(at_firmware, LOG_LEVEL_INF);
 
+void app_extras_init(void);
+
 /* Temporary test credentials; only seed fields missing from NVS. */
 #define APP_OTAA_DEVEUI_HEX "0011223344556677"
 #define APP_OTAA_APPEUI_HEX "0011223344556677"
@@ -503,6 +505,26 @@ static int cmd_sendint(const struct rak_at_request *req)
 	return 0;
 }
 
+void app_policy_pause(void)
+{
+	stop_auto_uplink();
+	(void)rak_fw_lorawan_join_stop();
+}
+
+void app_policy_resume(void)
+{
+	if (cycle_started && rak_fw_lorawan_is_joined() && app_auto_uplink_enabled() &&
+	    !uplink_in_flight) {
+		schedule_next_uplink(0U, false);
+	} else if (cycle_started && !uplink_in_flight) {
+		radio_bind_prepare_system_on_idle();
+	}
+}
+
+__attribute__((weak)) void app_extras_init(void)
+{
+}
+
 static void app_policy_start(void)
 {
 	k_mutex_init(&cycle_lock);
@@ -547,6 +569,7 @@ int main(void)
 
 	rak_at_init();
 	rak_at_register_standard_commands();
+	app_extras_init();
 	LOG_INF("AT framework init done");
 
 	/* Start with secondary buses suspended; resume only around RF windows. */
@@ -563,13 +586,13 @@ int main(void)
 		return ret;
 	}
 
-	app_policy_start();
-
-	/* Boot banner: full AT surface (includes SENDINT). UART settle for USB-UART. */
+	/* Boot banner before autojoin so RF-window UART LP cannot drop it. */
 	k_msleep(50);
 	rak_at_resp_line("RAK3162 AT firmware ready");
 	rak_at_print_command_list();
 	rak_at_resp_ok();
+
+	app_policy_start();
 
 	LOG_INF("zephyr_version: %s", KERNEL_VERSION_STRING);
 	LOG_INF("AT firmware ready (SENDINT=%u s, System ON idle)",

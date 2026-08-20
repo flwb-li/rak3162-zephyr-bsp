@@ -37,6 +37,7 @@ struct rak_at_request {
 
 typedef int (*rak_at_handler_t)(const struct rak_at_request *req);
 
+/** Register an AT command. Pass help=NULL to omit the command from AT?. */
 int rak_at_register_command(const char *name, rak_at_handler_t handler, const char *help);
 
 /**

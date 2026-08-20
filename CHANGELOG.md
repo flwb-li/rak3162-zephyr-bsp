@@ -5,6 +5,31 @@ All notable changes to the RAK3162 Zephyr BSP are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] - 2026-08-20
+
+Optional unpublished factory extras as an external Zephyr module (not in this
+sample). `AT+VER` reports `V_1.0.2`.
+
+### Added
+
+- `samples/at_firmware` optionally pulls an external extras module before Zephyr
+  configure (`RAK3162_AT_EXTRAS_DIR`, or west-workspace sibling
+  `rak3162-at-factory/`). Public clones without that module build product
+  firmware only
+- `help=NULL` on `rak_at_register_command()` omits the command from `AT?`
+  (still executable). Used by unpublished extras
+- Weak `app_extras_init()` / `app_keep_awake()` hooks so extras can register
+  and hold UART/buses without product AT commands in the published tree
+
+### Changed
+
+- `SOFTWARE_VERSION` → `V_1.0.2` (`lib/rak3162_runtime/src/config.h`, `AT+VER`)
+- Product `AT_COMMANDS.md`: CW is not a published product command; UART1 pin note
+  no longer mentions `AT+TEST`
+- README: recommend VS Code **Workbench for Zephyr** or **IDE for Zephyr**;
+  west CLI and Docker remain alternatives. Dropped the Windows-native
+  (no WSL) CLI walkthrough — use Mode 1 on Windows
+
 ## [1.0.1] - 2026-08-19
 
 Firmware test follow-up: AT parameter hardening, System OFF sleep/wake, and
