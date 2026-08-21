@@ -21,6 +21,15 @@ sample). `AT+VER` reports `V_1.0.2`.
 - Weak `app_extras_init()` / `app_keep_awake()` hooks so extras can register
   and hold UART/buses without product AT commands in the published tree
 
+### Fixed
+
+- `AT+JOIN` after `AT+BAND` other than 4 (default EU868) HardFaulted (`BFAR=0x4`
+  in `RegionEU868InitDefaults` RESET). Zephyr `lorawan_start()` restores
+  LoRaMAC `MacGroup2.Region` from Settings after init; `rak-fw` now drops
+  region-dependent NVM keys (`MacGroup1/2`, `RegionGroup1/2`, `ClassB`) when
+  the stored region does not match `AT+BAND`, keeping Crypto/DevNonce. No
+  change to upstream Zephyr / loramac-node
+
 ### Changed
 
 - `SOFTWARE_VERSION` → `V_1.0.2` (`lib/rak3162_runtime/src/config.h`, `AT+VER`)
