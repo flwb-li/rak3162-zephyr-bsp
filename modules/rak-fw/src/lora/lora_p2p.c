@@ -26,6 +26,8 @@ LOG_MODULE_REGISTER(rak_fw_p2p, LOG_LEVEL_INF);
 BUILD_ASSERT(DT_NODE_HAS_STATUS_OKAY(LORA_NODE), "lora0 alias required");
 
 #define P2P_DEFAULT_FREQ_HZ 868000000U
+#define P2P_FREQ_MIN_HZ 862000000UL
+#define P2P_FREQ_MAX_HZ 960000000UL
 #define P2P_DEFAULT_SF 7U
 #define P2P_DEFAULT_PREAMBLE 8U
 #define P2P_DEFAULT_TX_DBM 14
@@ -449,7 +451,8 @@ int rak_fw_lora_p2p_params_set(const char *param)
 
 	errno = 0;
 	freq = strtoul(parts[0], &end, 10);
-	if ((errno != 0) || (*end != '\0') || (freq < 150000000UL) || (freq > 960000000UL)) {
+	if ((errno != 0) || (*end != '\0') || (freq < P2P_FREQ_MIN_HZ) ||
+	    (freq > P2P_FREQ_MAX_HZ)) {
 		return -EINVAL;
 	}
 

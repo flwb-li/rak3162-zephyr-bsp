@@ -57,6 +57,11 @@ static void sanitize_cfg(struct rak_at_runtime_cfg *cfg)
 
 	cfg->sn[RAK_AT_SN_LEN] = '\0';
 	rak3162_storage_apply_lw_defaults(cfg);
+
+	/* RAK3162 HF SX1262: drop leftover EU433/CN470 from older firmware. */
+	if ((cfg->band == RAK_AT_BAND_EU433) || (cfg->band == RAK_AT_BAND_CN470)) {
+		cfg->band = RAK_AT_BAND_EU868;
+	}
 }
 
 static int save_active_cfg(const struct rak_at_runtime_cfg *cfg)

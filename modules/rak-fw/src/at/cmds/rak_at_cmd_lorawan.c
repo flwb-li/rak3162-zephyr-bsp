@@ -269,7 +269,7 @@ int rak_at_cmd_band(const struct rak_at_request *req)
 
 	if (req->form == RAK_AT_FORM_HELP) {
 		rak_at_resp_line(
-			"AT+BAND: get or set the active region (0=EU433,1=CN470,2=RU864,3=IN865,4=EU868,5=US915,6=AU915,7=KR920,8=AS923)");
+			"AT+BAND: get or set the active region (2=RU864,3=IN865,4=EU868,5=US915,6=AU915,7=KR920,8=AS923)");
 		rak_at_resp_ok();
 		return 0;
 	}
@@ -320,6 +320,105 @@ int rak_at_cmd_band(const struct rak_at_request *req)
 	}
 
 	cfg.band = (uint8_t)v;
+	cfg.valid_mask |= RAK_AT_CFG_VALID_LW_OPTS;
+	if (save_cfg(&cfg) != 0) {
+		rak_at_resp_error(NULL);
+		return -EIO;
+	}
+
+	rak_at_resp_ok();
+	return 0;
+}
+
+static int parse_hex_u16_4(const char *s, uint16_t *out)
+{
+	unsigned long v = 0UL;
+	size_t i;
+
+	if ((s == NULL) || (out == NULL) || (strlen(s) != 4U)) {
+		return -EINVAL;
+	}
+	for (i = 0U; i < 4U; i++) {
+		unsigned char c = (unsigned char)s[i];
+		unsigned int nib;
+
+		if (c >= (unsigned char)'0' && c <= (unsigned char)'9') {
+			nib = (unsigned int)(c - (unsigned char)'0');
+		} else if (c >= (unsigned char)'A' && c <= (unsigned char)'F') {
+			nib = (unsigned int)(c - (unsigned char)'A') + 10U;
+		} else if (c >= (unsigned char)'a' && c <= (unsigned char)'f') {
+			nib = (unsigned int)(c - (unsigned char)'a') + 10U;
+		} else {
+			return -EINVAL;
+		}
+		v = (v << 4) | nib;
+	}
+	*out = (uint16_t)v;
+	return 0;
+}
+
+int rak_at_cmd_mask(const struct rak_at_request *req)
+{
+	struct rak_at_runtime_cfg cfg;
+	uint16_t mask;
+	uint16_t shown;
+	int ret;
+
+	if (req->form == RAK_AT_FORM_HELP) {
+		rak_at_resp_line(
+			"AT+MASK: get or set the Channel Mask (US915/AU915 default 01FF)");
+		rak_at_resp_ok();
+		return 0;
+	}
+
+	rak_at_cfg_get_active(&cfg);
+
+	if (!nwm_is_lorawan() || (lw()->mask_supported == NULL) ||
+	    !lw()->mask_supported(cfg.band)) {
+		param_error();
+		return -EINVAL;
+	}
+
+	if (req->form == RAK_AT_FORM_GET) {
+		shown = cfg.chmask;
+		if (shown == 0U) {
+			shown = (lw()->mask_default != NULL) ?
+					lw()->mask_default(cfg.band) : 0U;
+		}
+		rak_at_resp_line("AT+MASK=%04X", shown);
+		rak_at_resp_ok();
+		return 0;
+	}
+
+	if (req->form != RAK_AT_FORM_SET) {
+		param_error();
+		return -EINVAL;
+	}
+
+	/* Malformed value before busy, matching RUI3 AT_PARAM_ERROR vs AT_BUSY_ERROR. */
+	if (parse_hex_u16_4(req->args, &mask) != 0) {
+		param_error();
+		return -EINVAL;
+	}
+
+	if (lw()->is_busy() || lw()->is_joining()) {
+		busy_error();
+		return -EBUSY;
+	}
+
+	if (lw()->apply_chmask != NULL) {
+		ret = lw()->apply_chmask(mask);
+		if (ret == -EBUSY) {
+			busy_error();
+			return -EBUSY;
+		}
+		if (ret != 0) {
+			param_error();
+			return ret;
+		}
+	}
+
+	cfg.chmask = mask;
 	cfg.valid_mask |= RAK_AT_CFG_VALID_LW_OPTS;
 	if (save_cfg(&cfg) != 0) {
 		rak_at_resp_error(NULL);
@@ -868,6 +967,7 @@ void rak_at_register_lorawan_commands(void)
 	(void)rak_at_register_command("NWKKEY", rak_at_cmd_nwkkey, "AT+NWKKEY");
 	(void)rak_at_register_command("NWM", rak_at_cmd_nwm, "AT+NWM");
 	(void)rak_at_register_command("BAND", rak_at_cmd_band, "AT+BAND");
+	(void)rak_at_register_command("MASK", rak_at_cmd_mask, "AT+MASK");
 	(void)rak_at_register_command("CFM", rak_at_cmd_cfm, "AT+CFM");
 	(void)rak_at_register_command("CFS", rak_at_cmd_cfs, "AT+CFS");
 	(void)rak_at_register_command("NJS", rak_at_cmd_njs, "AT+NJS");

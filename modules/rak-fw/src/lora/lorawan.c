@@ -247,17 +247,12 @@ int rak_fw_lorawan_band_to_region(uint8_t band, enum lorawan_region *region)
 		return -EINVAL;
 	}
 
+	/* RAK3162 SX1262 is HF-only. */
+	if ((band == RAK_AT_BAND_EU433) || (band == RAK_AT_BAND_CN470)) {
+		return -EINVAL;
+	}
+
 	switch (band) {
-#if defined(CONFIG_LORAMAC_REGION_EU433)
-	case RAK_AT_BAND_EU433:
-		*region = LORAWAN_REGION_EU433;
-		return 0;
-#endif
-#if defined(CONFIG_LORAMAC_REGION_CN470)
-	case RAK_AT_BAND_CN470:
-		*region = LORAWAN_REGION_CN470;
-		return 0;
-#endif
 #if defined(CONFIG_LORAMAC_REGION_RU864)
 	case RAK_AT_BAND_RU864:
 		*region = LORAWAN_REGION_RU864;
@@ -303,6 +298,142 @@ bool rak_fw_lorawan_band_supported(uint8_t band)
 	enum lorawan_region region;
 
 	return rak_fw_lorawan_band_to_region(band, &region) == 0;
+}
+
+#define LW_CHMASK_WORDS 6
+
+bool rak_fw_lorawan_mask_supported(uint8_t band)
+{
+	return (band == RAK_AT_BAND_US915) || (band == RAK_AT_BAND_AU915);
+}
+
+uint16_t rak_fw_lorawan_mask_default(uint8_t band)
+{
+	if ((band == RAK_AT_BAND_US915) || (band == RAK_AT_BAND_AU915)) {
+		return 0x01FFU;
+	}
+	return 0U;
+}
+
+static uint16_t rui_mask_max_for_band(uint8_t band)
+{
+	return rak_fw_lorawan_mask_default(band);
+}
+
+/* RUI3 AT+MASK: each bit is an 8-channel group. 0 means regional default. */
+static int rui_mask_to_mac(uint8_t band, uint16_t rui, uint16_t out[LW_CHMASK_WORDS])
+{
+	uint16_t max = rui_mask_max_for_band(band);
+	bool hybrid_500;
+	uint8_t g;
+
+	if (max == 0U) {
+		return -ENOTSUP;
+	}
+
+	memset(out, 0, sizeof(uint16_t) * LW_CHMASK_WORDS);
+	if (rui == 0U) {
+		rui = rak_fw_lorawan_mask_default(band);
+	}
+	rui &= max;
+	hybrid_500 = (band == RAK_AT_BAND_US915) || (band == RAK_AT_BAND_AU915);
+
+	for (g = 0U; g < 12U; g++) {
+		if ((rui & (uint16_t)BIT(g)) == 0U) {
+			continue;
+		}
+		/* US915/AU915 bit 8: all eight 500 kHz uplink channels. */
+		if (hybrid_500 && (g == 8U)) {
+			out[4] |= 0x00FFU;
+			continue;
+		}
+		out[g / 2U] |= ((g & 1U) != 0U) ? 0xFF00U : 0x00FFU;
+		if (hybrid_500 && (g < 8U)) {
+			out[4] |= (uint16_t)BIT(g);
+		}
+	}
+
+	return 0;
+}
+
+static int apply_chmask_locked(uint8_t band, uint16_t rui)
+{
+	uint16_t mac_mask[LW_CHMASK_WORDS];
+	MibRequestConfirm_t mib;
+	int ret;
+
+	if (!rak_fw_lorawan_mask_supported(band)) {
+		return 0;
+	}
+
+	ret = rui_mask_to_mac(band, rui, mac_mask);
+	if (ret != 0) {
+		return ret;
+	}
+
+	mib.Type = MIB_CHANNELS_DEFAULT_MASK;
+	mib.Param.ChannelsDefaultMask = mac_mask;
+	if (LoRaMacMibSetRequestConfirm(&mib) != LORAMAC_STATUS_OK) {
+		return -EINVAL;
+	}
+
+	ret = lorawan_set_channels_mask(mac_mask, LORAWAN_CHANNELS_MASK_SIZE_US915);
+	if (ret != 0) {
+		return ret;
+	}
+
+#if defined(REGION_US915) || defined(REGION_AU915)
+	mib.Type = MIB_NVM_CTXS;
+	if ((LoRaMacMibGetRequestConfirm(&mib) == LORAMAC_STATUS_OK) &&
+	    (mib.Param.Contexts != NULL)) {
+		memcpy(mib.Param.Contexts->RegionGroup1.ChannelsMaskRemaining,
+		       mib.Param.Contexts->RegionGroup2.ChannelsMask,
+		       sizeof(uint16_t) * LW_CHMASK_WORDS);
+	}
+#endif
+
+	LOG_INF("Applied AT+MASK=0x%04X (BAND=%u)", rui, band);
+	return 0;
+}
+
+int rak_fw_lorawan_apply_chmask(uint16_t rui_mask)
+{
+	struct rak_at_runtime_cfg cfg;
+	uint16_t max;
+	int ret;
+
+	ensure_lock();
+	k_mutex_lock(&lw_lock, K_FOREVER);
+
+	if (lw_busy || lw_joining) {
+		k_mutex_unlock(&lw_lock);
+		return -EBUSY;
+	}
+
+	ret = cfg_get_active(&cfg);
+	if (ret != 0) {
+		k_mutex_unlock(&lw_lock);
+		return ret;
+	}
+	if (!rak_fw_lorawan_mask_supported(cfg.band)) {
+		k_mutex_unlock(&lw_lock);
+		return -ENOTSUP;
+	}
+
+	max = rui_mask_max_for_band(cfg.band);
+	if ((rui_mask != 0U) && ((rui_mask & (uint16_t)~max) != 0U)) {
+		k_mutex_unlock(&lw_lock);
+		return -EINVAL;
+	}
+
+	if (!lw_started) {
+		k_mutex_unlock(&lw_lock);
+		return 0;
+	}
+
+	ret = apply_chmask_locked(cfg.band, rui_mask);
+	k_mutex_unlock(&lw_lock);
+	return ret;
 }
 
 #define LW_NVM_KEY_MAC_GROUP1    "lorawan/nvm/MacGroup1"
@@ -559,6 +690,14 @@ int rak_fw_lorawan_apply_band(uint8_t band)
 		dropped_session = true;
 	}
 
+	{
+		struct rak_at_runtime_cfg cfg;
+
+		if (cfg_get_active(&cfg) == 0) {
+			(void)apply_chmask_locked(band, cfg.chmask);
+		}
+	}
+
 	k_mutex_unlock(&lw_lock);
 	if (dropped_session) {
 		notify_join_status(false);
@@ -621,6 +760,8 @@ int rak_fw_lorawan_ensure_started(void)
 	lw_cfm = cfg.cfm;
 	lw_adr = (cfg.adr != 0U);
 	lorawan_enable_adr(lw_adr);
+
+	(void)apply_chmask_locked(cfg.band, cfg.chmask);
 
 	/*
 	 * Keep LoRaMAC NVM enabled for monotonic DevNonce storage, but do not

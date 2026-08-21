@@ -31,6 +31,9 @@ struct rak_at_lorawan_ops {
 	bool (*is_joining)(void);
 	bool (*band_supported)(uint8_t band);
 	int (*apply_band)(uint8_t band);
+	bool (*mask_supported)(uint8_t band);
+	uint16_t (*mask_default)(uint8_t band);
+	int (*apply_chmask)(uint16_t rui_mask);
 	void (*set_cfm)(uint8_t cfm);
 	uint8_t (*get_cfm)(void);
 	uint8_t (*get_cfs)(void);

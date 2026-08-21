@@ -24,7 +24,7 @@ configurable automatic uplinks via `AT+SENDINT`, and **System ON idle** between 
 (`AT+SLEEP` remains System OFF).
 Command style follows the [RUI3 AT Command Manual](https://docs.rakwireless.com/product-categories/software-apis-and-libraries/rui3/at-command-manual/) as a **practical subset**.
 Not implemented: ABP, Class B/C, P2P_FSK, CW, LPSEND, LINKCHECK,
-MASK/TXP, `AT+RETY`, and similar.
+TXP, `AT+RETY`, and similar.
 
 ---
 
@@ -148,6 +148,26 @@ RUI3 region numbers (default **4 = EU868**). Persisted in Settings.
 May be changed while idle (not joining / not sending). If currently joined,
 the session is dropped (`AT+NJS=0`) and a new OTAA is required.
 
+RAK3162 uses HF SX1262. **`0` (EU433) and `1` (CN470) are not supported**
+(`AT_PARAM_ERROR`). Supported: `2` RU864, `3` IN865, `4` EU868, `5` US915,
+`6` AU915, `7` KR920, `8` AS923-1. `9`–`12` are also unsupported (stack).
+
+### 4.3 `AT+MASK` — channel mask (US915 / AU915)
+
+RUI3 4-digit hex (0-9, a-f, A-F). Each bit is an 8-channel group.
+`0000` applies the regional default. Persisted in Settings; applied on
+stack start / `AT+BAND`.
+
+| Region | Default | Valid mask | Example |
+|--------|---------|------------|---------|
+| US915 / AU915 (`BAND=5/6`) | `01FF` | `0000`–`01FF` | `AT+MASK=0001` → ch 0–7 + 500 kHz ch 64 (TTN often `0002`) |
+
+SET on other bands, wrong length, or bits outside the valid mask returns
+`AT_PARAM_ERROR`. SET while joining/sending returns `AT_BUSY_ERROR`.
+Must match the gateway/NS sub-band.
+
+RUI3 also lists CN470 / LA915; this product has neither.
+
 ---
 
 ## 5. OTAA credentials and join
@@ -173,6 +193,7 @@ is non-zero and are always unconfirmed.
 | `AT+DEVEUI` / `AT+APPEUI` / `AT+APPKEY` / `AT+NWKKEY` | OTAA credentials (written to NVS immediately; changing them does **not** leave the current session by itself) |
 | `AT+DEVADDR` | Device address (8 hex chars). When OTAA-joined, `=?` returns the NS-assigned DevAddr. SET stores NVS for ABP prep (ABP join not implemented). |
 | `AT+JOIN` | `AT+JOIN=<cmd>:<auto>:<interval_s>:<attempts>`. `cmd=0` stops an in-progress join and stores `auto`. `cmd=1` starts a **new OTAA** even if currently joined. Does **not** stop `AT+SENDINT` by itself. |
+| `AT+MASK` | Channel mask for US915/AU915. GET default `01FF`; SET is exactly 4 hex digits. Other bands / bad value: `AT_PARAM_ERROR`. |
 | `AT+NJS` | Local join status (`1` while the stack thinks it is joined) |
 | `AT+SENDINT` | Auto uplink interval in seconds (`0` = off, default `10`) |
 | `AT+SEND` | Manual uplink `<port>:<hex>` (uses `AT+CFM`) |
@@ -192,6 +213,8 @@ ATZ                 # reboot; auto OTAA if join_auto=1
 ---
 
 ## 6. LoRa P2P
+
+Frequency 862–960 MHz (RAK3162 HF SX1262; 433/470 MHz is rejected).
 
 ```text
 AT+NWM=0

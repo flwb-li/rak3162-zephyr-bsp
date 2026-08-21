@@ -20,6 +20,7 @@ extern "C" {
 #define RAK_AT_NWM_P2P_LORA 0U
 #define RAK_AT_NWM_LORAWAN 1U
 
+/* RUI3 numbers; RAK3162 HF SX1262 does not support these. */
 #define RAK_AT_BAND_EU433 0U
 #define RAK_AT_BAND_CN470 1U
 #define RAK_AT_BAND_RU864 2U
@@ -66,6 +67,11 @@ struct rak_at_runtime_cfg {
 	uint8_t join_attempts;
 	/** Stored ABP DevAddr (host-endian). OTAA Join overwrites live MAC value. */
 	uint32_t devaddr;
+	/**
+	 * RUI3 AT+MASK (US915/AU915). Each bit is an 8-channel group.
+	 * 0 = regional default (01FF).
+	 */
+	uint16_t chmask;
 };
 
 struct rak_at_cfg_ops {

@@ -5,7 +5,7 @@ All notable changes to the RAK3162 Zephyr BSP are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
-## [1.0.2] - 2026-08-20
+## [1.0.2] - 2026-08-21
 
 Optional unpublished factory extras as an external Zephyr module (not in this
 sample). `AT+VER` reports `V_1.0.2`.
@@ -20,6 +20,10 @@ sample). `AT+VER` reports `V_1.0.2`.
   (still executable). Used by unpublished extras
 - Weak `app_extras_init()` / `app_keep_awake()` hooks so extras can register
   and hold UART/buses without product AT commands in the published tree
+- `AT+MASK` (RUI3): US915/AU915 8-channel groups. Default `01FF`; SET is
+  exactly 4 hex digits; `0000` = regional default. Other bands, malformed
+  input: `AT_PARAM_ERROR`; SET while Join/Send: `AT_BUSY_ERROR`. Applied on
+  LoRaMAC start and `AT+BAND`; persisted in Settings
 
 ### Fixed
 
@@ -33,6 +37,12 @@ sample). `AT+VER` reports `V_1.0.2`.
 ### Changed
 
 - `SOFTWARE_VERSION` → `V_1.0.2` (`lib/rak3162_runtime/src/config.h`, `AT+VER`)
+- RAK3162 SX1262 is HF-only. `AT+BAND` supports `2`–`8` (RU864 / IN865 /
+  EU868 / US915 / AU915 / KR920 / AS923-1). `0` (EU433) and `1` (CN470)
+  return `AT_PARAM_ERROR` and those LoRaMAC regions are not compiled in.
+  P2P frequency range is 862–960 MHz. Stored EU433/CN470 from older firmware
+  is coerced to EU868
+- Product `AT_COMMANDS.md` / `FACTORY_TEST.md`: HF-only `AT+BAND`, `AT+MASK`
 - Product `AT_COMMANDS.md`: CW is not a published product command; UART1 pin note
   no longer mentions `AT+TEST`
 - README: recommend VS Code **Workbench for Zephyr** or **IDE for Zephyr**;

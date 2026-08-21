@@ -112,6 +112,21 @@ bool rak_fw_lorawan_band_supported(uint8_t band);
  */
 int rak_fw_lorawan_apply_band(uint8_t band);
 
+/** True for US915 / AU915 (RUI3 AT+MASK; CN470/LA915 are not on this product). */
+bool rak_fw_lorawan_mask_supported(uint8_t band);
+
+/** RUI3 default: 01FF (US915/AU915); 0 if MASK is N/A. */
+uint16_t rak_fw_lorawan_mask_default(uint8_t band);
+
+/**
+ * @brief Apply a RUI3 AT+MASK value to LoRaMAC (8-channel groups).
+ *
+ * 0 applies the regional default. US915/AU915 bits 0–7 are 125 kHz groups
+ * plus the matching 500 kHz channel; bit 8 enables all 500 kHz channels.
+ * Requires the stack to be started.
+ */
+int rak_fw_lorawan_apply_chmask(uint16_t rui_mask);
+
 void rak_fw_lorawan_set_cfm(uint8_t cfm);
 uint8_t rak_fw_lorawan_get_cfm(void);
 uint8_t rak_fw_lorawan_get_cfs(void);
