@@ -648,16 +648,6 @@ static void emit_join_failed(int err)
 	evt_line("+EVT:JOIN FAILED");
 }
 
-/* Intermediate attempt failure (will retry); RUI3-style timeout tags when possible. */
-static void emit_join_attempt_failed(int err)
-{
-	if ((err == -ETIMEDOUT) || (err == -EAGAIN)) {
-		evt_line("+EVT:JOIN_FAILED_RX_TIMEOUT");
-	} else {
-		evt_line("+EVT:JOIN_FAILED_%d", -err);
-	}
-}
-
 static bool join_wait_interval(uint8_t interval_s)
 {
 	/* Return true if stop was requested during the wait. */
@@ -746,8 +736,8 @@ static void lw_work_handler(struct k_work *work)
 		join_cfg.otaa.dev_nonce = 0U;
 
 		/* RUI3: attempts==0 → retry until success or AT+JOIN=0.
-		 * Final +EVT:JOIN FAILED only after attempts are exhausted;
-		 * each attempt also emits JOIN_START / intermediate JOIN_FAILED_*.
+		 * JOIN FAILED is emitted only after attempts are exhausted
+		 * (not on every intermediate failure).
 		 */
 		while (true) {
 			ensure_lock();
@@ -763,9 +753,7 @@ static void lw_work_handler(struct k_work *work)
 			LOG_INF("Joining network (OTAA) attempt %u%s", attempt,
 				(jcopy.attempts == 0U) ? " (unlimited)" : "");
 
-			/* CONFIG_LOG=n: progress must go via +EVT on AT UART. */
 			rf_front_enable();
-			evt_line("+EVT:JOIN_START");
 			{
 				const struct rak_fw_board_ops *bops = rak_fw_board_ops();
 
@@ -774,7 +762,7 @@ static void lw_work_handler(struct k_work *work)
 				}
 			}
 			ret = lorawan_join(&join_cfg);
-			/* Keep UART muxed until attempt EVT is printed (same as SEND path). */
+			rf_front_disable();
 			last_err = ret;
 			LOG_INF("lorawan_join returned %d", ret);
 
@@ -791,7 +779,6 @@ static void lw_work_handler(struct k_work *work)
 				} else {
 					LOG_INF("Join stopped by AT+JOIN=0");
 				}
-				rf_front_disable();
 				break;
 			}
 
@@ -808,7 +795,6 @@ static void lw_work_handler(struct k_work *work)
 						bops->indicate_joined();
 					}
 				}
-				rf_front_disable();
 				/* rf_front_disable() ran before lw_joined; arm AT Sense now. */
 				if (rf_state_handler != NULL) {
 					rf_state_handler(false);
@@ -822,14 +808,9 @@ static void lw_work_handler(struct k_work *work)
 			/* Finite attempts exhausted? */
 			if ((jcopy.attempts != 0U) && (attempt >= jcopy.attempts)) {
 				emit_join_failed(last_err);
-				rf_front_disable();
 				notify_join_status(false);
 				break;
 			}
-
-			/* Will retry: show attempt failure before UART may enter Sense. */
-			emit_join_attempt_failed(ret);
-			rf_front_disable();
 
 			/* Wait reattempt interval (interruptible by stop). */
 			if (join_wait_interval(jcopy.interval_s)) {
