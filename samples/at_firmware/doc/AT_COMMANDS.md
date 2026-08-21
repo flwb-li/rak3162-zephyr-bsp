@@ -63,7 +63,9 @@ Async events (may appear on UART at any time):
 | Event | Description |
 |-------|-------------|
 | `+EVT:UART_WAKE` | Sense 唤醒完成且行缓冲已清空；收到后再发正式 AT |
+| `+EVT:JOIN_START` | OTAA join attempt started (progress; may repeat on retry) |
 | `+EVT:JOINED` | OTAA succeeded (app may start periodic uplink) |
+| `+EVT:JOIN_FAILED_RX_TIMEOUT` / `+EVT:JOIN_FAILED_<n>` | One attempt failed; join may retry |
 | `+EVT:JOIN FAILED` | OTAA failed (finite attempts exhausted) |
 | `+EVT:TX_DONE` | Uplink TX finished successfully |
 | `+EVT:SEND_CONFIRMED_OK` / `FAILED` | Confirmed uplink result (`AT+CFM=1`) |
