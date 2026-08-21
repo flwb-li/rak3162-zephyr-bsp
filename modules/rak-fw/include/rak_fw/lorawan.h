@@ -104,8 +104,9 @@ bool rak_fw_lorawan_band_supported(uint8_t band);
  * @brief Apply a RUI3 band code to the LoRaMAC region.
  *
  * When the stack is already started but idle (not joining, not joined, not
- * busy), reinitializes LoRaMAC with the new region. When not started, only
- * updates the region selected for the next @ref rak_fw_lorawan_ensure_started.
+ * busy), reinitializes LoRaMAC with the new region. Stale LoRaMAC NVM for a
+ * different region is discarded (Crypto/DevNonce is kept). When not started,
+ * only updates the region selected for the next @ref rak_fw_lorawan_ensure_started.
  *
  * @return 0 on success; -EBUSY if a session or RF job is active; other negative errno on failure.
  */

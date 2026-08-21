@@ -16,6 +16,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
+#if defined(CONFIG_SETTINGS)
+#include <zephyr/settings/settings.h>
+#endif
 
 #include <LoRaMac.h>
 #include <LoRaMacCrypto.h>
@@ -302,7 +305,129 @@ bool rak_fw_lorawan_band_supported(uint8_t band)
 	return rak_fw_lorawan_band_to_region(band, &region) == 0;
 }
 
-static int apply_region_from_cfg(void)
+#define LW_NVM_KEY_MAC_GROUP1    "lorawan/nvm/MacGroup1"
+#define LW_NVM_KEY_MAC_GROUP2    "lorawan/nvm/MacGroup2"
+#define LW_NVM_KEY_REGION_GROUP1 "lorawan/nvm/RegionGroup1"
+#define LW_NVM_KEY_REGION_GROUP2 "lorawan/nvm/RegionGroup2"
+#define LW_NVM_KEY_CLASS_B       "lorawan/nvm/ClassB"
+
+static LoRaMacRegion_t lorawan_region_to_loramac(enum lorawan_region region)
+{
+	switch (region) {
+	case LORAWAN_REGION_AS923:
+		return LORAMAC_REGION_AS923;
+	case LORAWAN_REGION_AU915:
+		return LORAMAC_REGION_AU915;
+	case LORAWAN_REGION_CN470:
+		return LORAMAC_REGION_CN470;
+	case LORAWAN_REGION_CN779:
+		return LORAMAC_REGION_CN779;
+	case LORAWAN_REGION_EU433:
+		return LORAMAC_REGION_EU433;
+	case LORAWAN_REGION_EU868:
+		return LORAMAC_REGION_EU868;
+	case LORAWAN_REGION_KR920:
+		return LORAMAC_REGION_KR920;
+	case LORAWAN_REGION_IN865:
+		return LORAMAC_REGION_IN865;
+	case LORAWAN_REGION_US915:
+		return LORAMAC_REGION_US915;
+	case LORAWAN_REGION_RU864:
+		return LORAMAC_REGION_RU864;
+	default:
+		return LORAMAC_REGION_EU868;
+	}
+}
+
+/*
+ * Zephyr lorawan_start() restores MacGroup2 (including Region) after
+ * LoRaMacInitialization(). Keep Crypto/DevNonce; drop region-dependent keys
+ * so a previous EU868 (etc.) blob cannot rewind the newly selected region.
+ */
+static void lorawan_nvm_drop_region_ctx(void)
+{
+	if (!IS_ENABLED(CONFIG_LORAWAN_NVM_SETTINGS) || !IS_ENABLED(CONFIG_SETTINGS)) {
+		return;
+	}
+
+#if defined(CONFIG_SETTINGS)
+	(void)settings_subsys_init();
+	(void)settings_delete(LW_NVM_KEY_MAC_GROUP1);
+	(void)settings_delete(LW_NVM_KEY_MAC_GROUP2);
+	(void)settings_delete(LW_NVM_KEY_REGION_GROUP1);
+	(void)settings_delete(LW_NVM_KEY_REGION_GROUP2);
+	(void)settings_delete(LW_NVM_KEY_CLASS_B);
+#endif
+}
+
+static void lorawan_nvm_discard_if_region_mismatch(enum lorawan_region want)
+{
+#if defined(CONFIG_SETTINGS)
+	LoRaMacNvmDataGroup2_t mac2;
+	ssize_t n;
+
+	if (!IS_ENABLED(CONFIG_LORAWAN_NVM_SETTINGS)) {
+		return;
+	}
+
+	(void)settings_subsys_init();
+	n = settings_load_one(LW_NVM_KEY_MAC_GROUP2, &mac2, sizeof(mac2));
+	if (n < 0) {
+		return;
+	}
+	if ((n != (ssize_t)sizeof(mac2)) ||
+	    (mac2.Region != lorawan_region_to_loramac(want))) {
+		LOG_INF("Dropping LoRaWAN region NVM (stored region %d, BAND region %d, size %d)",
+			(n == (ssize_t)sizeof(mac2)) ? (int)mac2.Region : -1, (int)want,
+			(int)n);
+		lorawan_nvm_drop_region_ctx();
+	}
+#else
+	ARG_UNUSED(want);
+#endif
+}
+
+static bool lorawan_nvm_region_is(enum lorawan_region want)
+{
+	MibRequestConfirm_t mib = {
+		.Type = MIB_NVM_CTXS,
+	};
+
+	if (LoRaMacMibGetRequestConfirm(&mib) != LORAMAC_STATUS_OK) {
+		return false;
+	}
+	if ((mib.Param.Contexts == NULL)) {
+		return false;
+	}
+
+	return mib.Param.Contexts->MacGroup2.Region == lorawan_region_to_loramac(want);
+}
+
+static int lorawan_start_for_region(enum lorawan_region region)
+{
+	int ret;
+
+	lorawan_nvm_discard_if_region_mismatch(region);
+
+	ret = lorawan_start();
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (lorawan_nvm_region_is(region)) {
+		return 0;
+	}
+
+	LOG_WRN("NVM restore overwrote LoRaWAN region; retry without region ctx");
+	lorawan_nvm_drop_region_ctx();
+	if (LoRaMacDeInitialization() != LORAMAC_STATUS_OK) {
+		return -EBUSY;
+	}
+
+	return lorawan_start();
+}
+
+static int apply_region_from_cfg(enum lorawan_region *out_region)
 {
 	struct rak_at_runtime_cfg cfg;
 	enum lorawan_region region;
@@ -322,6 +447,10 @@ static int apply_region_from_cfg(void)
 	if (ret < 0) {
 		LOG_ERR("lorawan_set_region failed: %d", ret);
 		return ret;
+	}
+
+	if (out_region != NULL) {
+		*out_region = region;
 	}
 
 	return 0;
@@ -410,7 +539,7 @@ int rak_fw_lorawan_apply_band(uint8_t band)
 	/* Deinit leaves the radio asleep (DIO1 off); force wake on next RF window. */
 	radio_cold_sleeping = true;
 
-	ret = lorawan_start();
+	ret = lorawan_start_for_region(region);
 	if (ret != 0) {
 		lw_started = false;
 		k_mutex_unlock(&lw_lock);
@@ -451,6 +580,7 @@ int rak_fw_lorawan_ensure_started(void)
 {
 	const struct device *lora_dev;
 	struct rak_at_runtime_cfg cfg;
+	enum lorawan_region region;
 	int ret;
 
 	ensure_lock();
@@ -468,13 +598,13 @@ int rak_fw_lorawan_ensure_started(void)
 		return -ENODEV;
 	}
 
-	ret = apply_region_from_cfg();
+	ret = apply_region_from_cfg(&region);
 	if (ret < 0) {
 		k_mutex_unlock(&lw_lock);
 		return ret;
 	}
 
-	ret = lorawan_start();
+	ret = lorawan_start_for_region(region);
 	if (ret < 0) {
 		LOG_ERR("lorawan_start failed: %d", ret);
 		k_mutex_unlock(&lw_lock);
